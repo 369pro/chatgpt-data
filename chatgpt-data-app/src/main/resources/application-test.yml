@@ -1,0 +1,8 @@
+server:
+  port: 8090
+
+# 日志
+logging:
+  level:
+    root: info
+  config: classpath:logback-spring.xml
