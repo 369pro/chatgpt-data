@@ -48,6 +48,11 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- chatgpt-sdk-java https://gitcode.net/KnowledgePlanet/chatgpt/chatgpt-sdk-java-->
+        <dependency>
+            <groupId>cn.bugstack.chatgpt</groupId>
+            <artifactId>chatgpt-sdk-java</artifactId>
+        </dependency>
         <!-- 自身模块 begin -->
         <dependency>
             <groupId>cn.bugstack</groupId>
@@ -63,7 +68,7 @@
     </dependencies>
 
     <build>
-        <finalName>xfg-frame-app</finalName>
+        <finalName>chatgpt-data-app</finalName>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
