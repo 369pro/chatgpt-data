@@ -2,6 +2,7 @@ package cn.bugstack.chatgpt.data.domain.openai.service;
 
 import cn.bugstack.chatgpt.common.Constants;
 import cn.bugstack.chatgpt.data.domain.openai.model.aggregates.ChatProcessAggregate;
+import cn.bugstack.chatgpt.data.types.exception.ChatGPTException;
 import cn.bugstack.chatgpt.domain.chat.ChatChoice;
 import cn.bugstack.chatgpt.domain.chat.ChatCompletionRequest;
 import cn.bugstack.chatgpt.domain.chat.ChatCompletionResponse;
@@ -67,7 +68,7 @@ public class ChatService extends AbstractChatService {
                     try {
                         emitter.send(delta.getContent());
                     } catch (Exception e) {
-                        throw new RuntimeException(e);
+                        throw new ChatGPTException(e.getMessage());
                     }
                 }
 
