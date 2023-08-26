@@ -25,7 +25,7 @@ chatgpt:
   sdk:
     config:
       # 官网地址 https://api.openai.com/ 1美金:7人民币 额度不过期，直至使用结束。1美金额度 = 500000 Token 测试使用只买1美金即可
-      api-host: https://sdk.xfg.im/
+      api-host: https://pro-share-api.zcyai.com/
       # 官网申请 https://platform.openai.com/account/api-keys
       api-key: REDACTED
 
