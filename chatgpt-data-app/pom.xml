@@ -69,7 +69,10 @@
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>com.github.houbb</groupId>
+            <artifactId>sensitive-word</artifactId>
+        </dependency>
         <!-- 自身模块 begin -->
         <dependency>
             <groupId>cn.bugstack</groupId>

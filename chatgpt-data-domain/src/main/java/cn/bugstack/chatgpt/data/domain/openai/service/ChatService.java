@@ -2,6 +2,10 @@ package cn.bugstack.chatgpt.data.domain.openai.service;
 
 import cn.bugstack.chatgpt.common.Constants;
 import cn.bugstack.chatgpt.data.domain.openai.model.aggregates.ChatProcessAggregate;
+import cn.bugstack.chatgpt.data.domain.openai.model.entity.RuleLogicEntity;
+import cn.bugstack.chatgpt.data.domain.openai.model.valobj.LogicCheckTypeVO;
+import cn.bugstack.chatgpt.data.domain.openai.service.rule.ILogicFilter;
+import cn.bugstack.chatgpt.data.domain.openai.service.rule.factory.DefaultLogicFactory;
 import cn.bugstack.chatgpt.data.types.exception.ChatGPTException;
 import cn.bugstack.chatgpt.domain.chat.ChatChoice;
 import cn.bugstack.chatgpt.domain.chat.ChatCompletionRequest;
@@ -17,7 +21,9 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
+import javax.annotation.Resource;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -27,6 +33,20 @@ import java.util.stream.Collectors;
  */
 @Service
 public class ChatService extends AbstractChatService {
+
+    @Resource
+    private DefaultLogicFactory logicFactory;
+
+    @Override
+    protected RuleLogicEntity<ChatProcessAggregate> doCheckLogic(ChatProcessAggregate chatProcess, String... logics) throws Exception {
+        Map<String, ILogicFilter> logicFilterMap = logicFactory.openLogicFilter();
+        RuleLogicEntity<ChatProcessAggregate> filter = null;
+        for (String code : logics) {
+            filter = logicFilterMap.get(code).filter(chatProcess);
+            if (!LogicCheckTypeVO.SUCCESS.equals(filter.getType())) return filter;
+        }
+        return filter;
+    }
 
     @Override
     protected void doMessageResponse(ChatProcessAggregate chatProcess, ResponseBodyEmitter emitter) throws JsonProcessingException {
