@@ -40,12 +40,12 @@ public class ChatService extends AbstractChatService {
     @Override
     protected RuleLogicEntity<ChatProcessAggregate> doCheckLogic(ChatProcessAggregate chatProcess, String... logics) throws Exception {
         Map<String, ILogicFilter> logicFilterMap = logicFactory.openLogicFilter();
-        RuleLogicEntity<ChatProcessAggregate> filter = null;
         for (String code : logics) {
-            filter = logicFilterMap.get(code).filter(chatProcess);
+            RuleLogicEntity<ChatProcessAggregate> filter = logicFilterMap.get(code).filter(chatProcess);
             if (!LogicCheckTypeVO.SUCCESS.equals(filter.getType())) return filter;
         }
-        return filter;
+        return RuleLogicEntity.<ChatProcessAggregate>builder()
+                .type(LogicCheckTypeVO.SUCCESS).data(chatProcess).build();
     }
 
     @Override
