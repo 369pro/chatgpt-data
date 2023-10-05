@@ -44,7 +44,7 @@
 
     <update id="updateOrderPayInfo" parameterType="cn.bugstack.chatgpt.data.infrastructure.po.OpenAIOrderPO">
         UPDATE openai_order SET
-        pay_url = #{payType},
+        pay_url = #{payUrl},
         pay_status = #{payStatus},
         update_time = now()
         WHERE openid = #{openid} AND order_id = #{orderId}

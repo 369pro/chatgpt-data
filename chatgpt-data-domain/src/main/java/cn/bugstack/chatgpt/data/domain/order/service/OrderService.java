@@ -77,6 +77,7 @@ public class OrderService extends AbstractOrderService {
                 .payUrl(prepay.getCodeUrl())
                 .payStatus(PayStatusVO.WAIT)
                 .build();
+
         // 更新订单支付信息
         orderRepository.updateOrderPayInfo(payOrderEntity);
         return payOrderEntity;
