@@ -8,6 +8,7 @@ import cn.bugstack.chatgpt.data.domain.order.model.entity.UnpaidOrderEntity;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
@@ -30,5 +31,7 @@ public interface IOrderRepository {
     CreateOrderAggregate queryOrder(String orderId);
 
     void deliverGoods(String orderId);
+
+    List<String> queryReplenishmentOrder();
 
 }

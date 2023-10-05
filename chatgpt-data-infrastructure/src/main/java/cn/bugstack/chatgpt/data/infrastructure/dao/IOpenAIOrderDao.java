@@ -4,6 +4,8 @@ import cn.bugstack.chatgpt.data.domain.order.model.entity.OrderEntity;
 import cn.bugstack.chatgpt.data.infrastructure.po.OpenAIOrderPO;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.List;
+
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
  * @description 订单Dao
@@ -23,5 +25,7 @@ public interface IOpenAIOrderDao {
     OpenAIOrderPO queryOrder(String orderId);
 
     int updateOrderStatusDeliverGoods(String orderId);
+
+    List<String> queryReplenishmentOrder();
 
 }

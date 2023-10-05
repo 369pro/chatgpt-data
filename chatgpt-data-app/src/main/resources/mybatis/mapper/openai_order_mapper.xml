@@ -69,10 +69,17 @@
         WHERE order_id = #{orderId}
     </select>
 
-    <select id="updateOrderStatusDeliverGoods" parameterType="java.lang.String">
+    <update id="updateOrderStatusDeliverGoods" parameterType="java.lang.String">
         UPDATE openai_order SET
         order_status = 2
         WHERE order_id = #{orderId} AND order_status = 1
+    </update>
+
+    <select id="queryReplenishmentOrder" resultType="java.lang.String">
+        SELECT order_id as orderId FROM openai_order
+        WHERE order_status = 1 AND pay_status = 1 AND NOW() >= order_time + INTERVAL 3 MINUTE
+        ORDER BY id ASC
+        LIMIT 10
     </select>
 
 </mapper>

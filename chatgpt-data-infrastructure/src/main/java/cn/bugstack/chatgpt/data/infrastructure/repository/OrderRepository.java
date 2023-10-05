@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
@@ -149,6 +150,11 @@ public class OrderRepository implements IOrderRepository {
         } else {
             userAccountDao.insert(userAccountPOReq);
         }
+    }
+
+    @Override
+    public List<String> queryReplenishmentOrder() {
+        return openAIOrderDao.queryReplenishmentOrder();
     }
 
 }

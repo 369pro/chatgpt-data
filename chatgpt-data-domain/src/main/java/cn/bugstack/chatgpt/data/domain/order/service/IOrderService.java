@@ -6,6 +6,7 @@ import cn.bugstack.chatgpt.data.domain.order.model.entity.ShopCartEntity;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
@@ -42,5 +43,10 @@ public interface IOrderService {
      * @param orderId 订单ID
      */
     void deliverGoods(String orderId);
+
+    /**
+     * 查询待补货订单
+     */
+    List<String> queryReplenishmentOrder();
 
 }

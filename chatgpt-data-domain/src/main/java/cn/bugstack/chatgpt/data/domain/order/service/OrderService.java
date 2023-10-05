@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
@@ -96,6 +97,11 @@ public class OrderService extends AbstractOrderService {
     @Override
     public void deliverGoods(String orderId) {
         orderRepository.deliverGoods(orderId);
+    }
+
+    @Override
+    public List<String> queryReplenishmentOrder() {
+        return orderRepository.queryReplenishmentOrder();
     }
 
 }
