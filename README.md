@@ -19,7 +19,7 @@ curl -X POST \
 curl -X POST \
 http://localhost:8091/api/v1/auth/login \
 -H 'Content-Type: application/x-www-form-urlencoded' \
--d 'code=7884'
+-d 'code=6065'
 ```
 
 - 登录后可以获取 Token
@@ -43,3 +43,23 @@ http://localhost:8091/api/v1/chatgpt/chat/completions \
 ```
 
 - Token 是通过登录从控制台复制的，注意可别复制错了。
+
+### 4. 查询商品列表
+
+```java
+curl -X GET \
+-H "Authorization: REDACTED" \
+-H "Content-Type: application/x-www-form-urlencoded" \
+http://localhost:8091/api/v1/sale/query_product_list
+```
+
+### 5. 用户下单商品
+
+```java
+curl -X POST \
+-H "Authorization: REDACTED" \
+-H "Content-Type: application/x-www-form-urlencoded" \
+-d "productId=1001" \
+http://localhost:8091/api/v1/sale/create_pay_order
+```
+
