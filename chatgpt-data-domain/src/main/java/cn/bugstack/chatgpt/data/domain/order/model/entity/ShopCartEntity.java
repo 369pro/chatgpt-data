@@ -26,4 +26,12 @@ public class ShopCartEntity {
      */
     private Integer productId;
 
+    @Override
+    public String toString() {
+        return "ShopCartEntity{" +
+                "openid='" + openid + '\'' +
+                ", productId=" + productId +
+                '}';
+    }
+
 }

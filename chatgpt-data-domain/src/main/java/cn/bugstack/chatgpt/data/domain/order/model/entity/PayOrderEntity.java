@@ -34,4 +34,14 @@ public class PayOrderEntity {
      */
     private PayStatusVO payStatus;
 
+    @Override
+    public String toString() {
+        return "PayOrderEntity{" +
+                "openid='" + openid + '\'' +
+                ", orderId='" + orderId + '\'' +
+                ", payUrl='" + payUrl + '\'' +
+                ", payStatus=" + payStatus.getCode() + ": " + payStatus.getDesc() +
+                '}';
+    }
+
 }
