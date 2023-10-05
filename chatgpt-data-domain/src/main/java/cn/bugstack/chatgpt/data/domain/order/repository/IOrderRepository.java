@@ -6,6 +6,9 @@ import cn.bugstack.chatgpt.data.domain.order.model.entity.ProductEntity;
 import cn.bugstack.chatgpt.data.domain.order.model.entity.ShopCartEntity;
 import cn.bugstack.chatgpt.data.domain.order.model.entity.UnpaidOrderEntity;
 
+import java.math.BigDecimal;
+import java.util.Date;
+
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
  * @description 订单仓储接口
@@ -21,5 +24,11 @@ public interface IOrderRepository {
     void saveOrder(CreateOrderAggregate aggregate);
 
     void updateOrderPayInfo(PayOrderEntity payOrderEntity);
+
+    boolean changeOrderPaySuccess(String orderId, String transactionId, BigDecimal totalAmount, Date payTime);
+
+    CreateOrderAggregate queryOrder(String orderId);
+
+    void deliverGoods(String orderId);
 
 }

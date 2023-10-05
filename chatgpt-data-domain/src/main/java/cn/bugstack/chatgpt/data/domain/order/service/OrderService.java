@@ -83,4 +83,19 @@ public class OrderService extends AbstractOrderService {
         return payOrderEntity;
     }
 
+    @Override
+    public boolean changeOrderPaySuccess(String orderId, String transactionId, BigDecimal totalAmount, Date payTime) {
+        return orderRepository.changeOrderPaySuccess(orderId, transactionId, totalAmount, payTime);
+    }
+
+    @Override
+    public CreateOrderAggregate queryOrder(String orderId) {
+        return orderRepository.queryOrder(orderId);
+    }
+
+    @Override
+    public void deliverGoods(String orderId) {
+        orderRepository.deliverGoods(orderId);
+    }
+
 }
