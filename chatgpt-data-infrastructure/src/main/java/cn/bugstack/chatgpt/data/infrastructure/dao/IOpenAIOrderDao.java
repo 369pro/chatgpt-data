@@ -28,4 +28,10 @@ public interface IOpenAIOrderDao {
 
     List<String> queryReplenishmentOrder();
 
+    List<String> queryNoPayNotifyOrder();
+
+    List<String> queryTimeoutCloseOrderList();
+
+    boolean changeOrderClose(String orderId);
+
 }
