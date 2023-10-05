@@ -84,6 +84,15 @@
             <groupId>com.github.houbb</groupId>
             <artifactId>sensitive-word</artifactId>
         </dependency>
+        <!-- SDK：https://github.com/wechatpay-apiv3/wechatpay-java -->
+        <dependency>
+            <groupId>com.github.wechatpay-apiv3</groupId>
+            <artifactId>wechatpay-java</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+        </dependency>
         <!-- 自身模块 begin -->
         <dependency>
             <groupId>cn.bugstack</groupId>
