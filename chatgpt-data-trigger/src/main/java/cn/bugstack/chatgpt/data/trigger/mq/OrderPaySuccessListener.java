@@ -1,6 +1,5 @@
 package cn.bugstack.chatgpt.data.trigger.mq;
 
-import cn.bugstack.chatgpt.data.domain.order.model.aggregates.CreateOrderAggregate;
 import cn.bugstack.chatgpt.data.domain.order.service.IOrderService;
 import com.google.common.eventbus.Subscribe;
 import lombok.extern.slf4j.Slf4j;
