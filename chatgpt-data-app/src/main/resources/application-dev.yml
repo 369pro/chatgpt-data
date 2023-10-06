@@ -13,6 +13,22 @@ app:
     # 白名单，不做频次拦截【微信的openai】oxfA9w8-23yvwTmo2ombz0E4zJv4
     white-list: ojbZUv18lbmriaTjcCWBYkOrSbHA
 
+# 支付配置；根据sdk的介绍，自行申请
+wxpay:
+  config:
+    # 申请支付主体的 appid
+    appid:
+    # 商户号
+    mchid:
+    # 回调地址，微信支付成功后，会调用你配置的地址，告知支付成功
+    notify-url: http://你的域名.natapp1.cc/api/v1/mall/pay_notify
+    # 商户API私钥路径
+    private-key-path: cert/apiclient_key.pem
+    # 商户证书序列号：openssl x509 -in apiclient_cert.pem -noout -serial
+    merchant-serial-number:
+    # 商户APIV3密钥
+    api-v3-key:
+
 # 线程池配置
 thread:
   pool:
