@@ -39,3 +39,5 @@ build/
 /data/
 /.idea/
 /chatgpt-data-app/data/
+/docs/draw.io/*.bkp
+/docs/app/log/
