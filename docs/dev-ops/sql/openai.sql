@@ -7,7 +7,7 @@
 #
 # 主机: 127.0.0.1 (MySQL 5.6.39)
 # 数据库: openai
-# 生成时间: 2023-10-05 02:16:49 +0000
+# 生成时间: 2023-10-05 23:19:49 +0000
 # ************************************************************
 
 
@@ -33,6 +33,7 @@ CREATE TABLE `openai_order` (
   `product_id` int(4) NOT NULL COMMENT '商品ID',
   `product_name` varchar(32) NOT NULL COMMENT '商品名称',
   `product_quota` int(8) NOT NULL COMMENT '商品额度',
+  `product_model_types` varchar(128) DEFAULT NULL COMMENT '可用模型；gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4,gpt-4-32k',
   `order_id` varchar(12) NOT NULL COMMENT '订单编号',
   `order_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '下单时间',
   `order_status` tinyint(1) NOT NULL COMMENT '订单状态；0-创建完成、1-等待发货、2-发货完成、3-系统关单',
@@ -42,11 +43,17 @@ CREATE TABLE `openai_order` (
   `pay_amount` decimal(10,2) DEFAULT NULL COMMENT '支付金额；支付成功后，以回调信息更新金额',
   `transaction_id` varchar(32) DEFAULT NULL COMMENT '交易单号；支付成功后，回调信息的交易单号',
   `pay_status` tinyint(1) DEFAULT NULL COMMENT '支付状态；0-等待支付、1-支付完成、2-支付失败、3-放弃支付',
+  `pay_time` datetime DEFAULT NULL COMMENT '支付时间',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+LOCK TABLES `openai_order` WRITE;
+/*!40000 ALTER TABLE `openai_order` DISABLE KEYS */;
+
+/*!40000 ALTER TABLE `openai_order` ENABLE KEYS */;
+UNLOCK TABLES;
 
 
 # 转储表 openai_product
@@ -59,15 +66,26 @@ CREATE TABLE `openai_product` (
   `product_id` int(4) NOT NULL COMMENT '商品ID',
   `product_name` varchar(32) NOT NULL COMMENT '商品名称',
   `product_desc` varchar(128) NOT NULL COMMENT '商品描述',
+  `product_model_types` varchar(128) DEFAULT NULL COMMENT '可用模型；gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4,gpt-4-32k',
   `quota` int(8) NOT NULL COMMENT '额度次数',
   `price` decimal(10,2) NOT NULL COMMENT '商品价格',
   `sort` int(4) NOT NULL COMMENT '商品排序',
   `is_enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否有效；0无效、1有效',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_product_id_enabled` (`product_id`,`is_enabled`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+LOCK TABLES `openai_product` WRITE;
+/*!40000 ALTER TABLE `openai_product` DISABLE KEYS */;
+
+INSERT INTO `openai_product` (`id`, `product_id`, `product_name`, `product_desc`, `product_model_types`, `quota`, `price`, `sort`, `is_enabled`, `create_time`, `update_time`)
+VALUES
+	(1,1001,'测试商品','测试商品请勿下单',NULL,100,0.11,1,1,'2023-10-05 16:51:47','2023-10-05 16:51:47');
+
+/*!40000 ALTER TABLE `openai_product` ENABLE KEYS */;
+UNLOCK TABLES;
 
 
 # 转储表 user_account
