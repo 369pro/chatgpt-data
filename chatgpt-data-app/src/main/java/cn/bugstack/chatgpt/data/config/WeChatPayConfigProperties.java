@@ -12,6 +12,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "wxpay.config", ignoreInvalidFields = true)
 public class WeChatPayConfigProperties {
 
+    /** 状态；open = 开启、close 关闭 */
+    private boolean enable;
     /** 申请支付主体的 appid */
     private String appid;
     /** 商户号 */
@@ -24,5 +26,9 @@ public class WeChatPayConfigProperties {
     private String merchantSerialNumber;
     /** 商户APIV3密钥 */
     private String apiV3Key;
+
+//    public boolean isEnable(){
+//        return "open".equals(enable);
+//    }
 
 }

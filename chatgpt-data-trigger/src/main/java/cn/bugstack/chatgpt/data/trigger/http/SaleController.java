@@ -13,6 +13,8 @@ import com.google.common.eventbus.EventBus;
 import com.wechat.pay.java.core.notification.NotificationParser;
 import com.wechat.pay.java.service.partnerpayments.nativepay.model.Transaction;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -36,8 +38,9 @@ import java.util.List;
 @RequestMapping("/api/${app.config.api-version}/sale/")
 public class SaleController {
 
-    @Resource
+    @Autowired(required = false)
     private NotificationParser notificationParser;
+
     @Resource
     private IOrderService orderService;
     @Resource
