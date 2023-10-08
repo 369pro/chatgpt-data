@@ -77,7 +77,7 @@ public class OrderService extends AbstractOrderService {
             PrepayResponse prepay = payService.prepay(request);
             codeUrl = prepay.getCodeUrl();
         } else {
-            codeUrl = "因未配置支付渠道，所以暂时不能生成支付URL";
+            codeUrl = "因你未配置支付渠道，所以暂时不能生成有效的支付URL。请配置支付渠道后，在application-dev.yml中配置支付渠道信息";
         }
 
         PayOrderEntity payOrderEntity = PayOrderEntity.builder()

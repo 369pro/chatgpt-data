@@ -28,7 +28,7 @@ public class OrderServiceTest {
     @Test
     public void test_createOrder() {
         ShopCartEntity shopCartEntity = ShopCartEntity.builder()
-                .openid("xfg")
+                .openid("xfg-test02")
                 .productId(1001)
                 .build();
         PayOrderEntity payOrderEntity = orderService.createOrder(shopCartEntity);

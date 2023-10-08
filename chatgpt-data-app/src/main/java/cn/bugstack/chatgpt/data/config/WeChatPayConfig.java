@@ -64,7 +64,6 @@ public class WeChatPayConfig {
     @ConditionalOnBean(NotificationConfig.class)
     @ConditionalOnProperty(value = "wxpay.config.enabled", havingValue = "true", matchIfMissing = false)
     public NotificationParser buildNotificationParser(NotificationConfig notificationConfig) {
-        if (null == notificationConfig) return null;
         return new NotificationParser(notificationConfig);
     }
 

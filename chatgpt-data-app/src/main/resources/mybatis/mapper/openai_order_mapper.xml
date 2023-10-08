@@ -84,7 +84,7 @@
 
     <select id="queryNoPayNotifyOrder" resultType="java.lang.String">
         SELECT order_id as orderId FROM openai_order
-        WHERE order_status = 0 AND pay_status = 0 AND NOW() >= order_time + INTERVAL 5 MINUTE
+        WHERE order_status = 0 AND pay_status = 0 AND NOW() >= order_time + INTERVAL 1 MINUTE
         ORDER BY id ASC
         LIMIT 10
     </select>

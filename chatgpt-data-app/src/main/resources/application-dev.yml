@@ -17,7 +17,7 @@ app:
 wxpay:
   config:
     # 状态；true = 开启、false 关闭
-    enable: false
+    enabled: false
     # 申请支付主体的 appid
     appid:
     # 商户号

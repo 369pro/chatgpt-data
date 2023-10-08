@@ -56,6 +56,10 @@ public class NoPayNotifyOrderJob {
                 request.setMchid(mchid);
                 request.setOutTradeNo(orderId);
                 Transaction transaction = payService.queryOrderByOutTradeNo(request);
+                if (!Transaction.TradeStateEnum.SUCCESS.equals(transaction.getTradeState())) {
+                    log.info("定时任务，订单支付状态更新，当前订单未支付 orderId is {}", orderId);
+                    continue;
+                }
                 // 支付单号
                 String transactionId = transaction.getTransactionId();
                 Integer total = transaction.getAmount().getTotal();

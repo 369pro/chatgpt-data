@@ -7,7 +7,7 @@
 #
 # 主机: 127.0.0.1 (MySQL 5.6.39)
 # 数据库: openai
-# 生成时间: 2023-10-05 23:19:49 +0000
+# 生成时间: 2023-10-08 01:32:51 +0000
 # ************************************************************
 
 
@@ -46,7 +46,10 @@ CREATE TABLE `openai_order` (
   `pay_time` datetime DEFAULT NULL COMMENT '支付时间',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_order_id` (`order_id`),
+  KEY `idx_openid` (`openid`),
+  KEY `idx_order_status_pay_status_order_time` (`order_time`,`order_status`,`pay_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 LOCK TABLES `openai_order` WRITE;
@@ -82,7 +85,10 @@ LOCK TABLES `openai_product` WRITE;
 
 INSERT INTO `openai_product` (`id`, `product_id`, `product_name`, `product_desc`, `product_model_types`, `quota`, `price`, `sort`, `is_enabled`, `create_time`, `update_time`)
 VALUES
-	(1,1001,'测试商品','测试商品请勿下单',NULL,100,0.11,1,1,'2023-10-05 16:51:47','2023-10-05 16:51:47');
+	(1,1001,'OpenAi 测试商品(3.5)','测试商品请勿下单','gpt-3.5-turbo,gpt-3.5-turbo-16k',100,0.01,1,1,'2023-10-07 18:45:36','2023-10-07 18:45:36'),
+	(2,1002,'OpenAi 测试商品(3.5)','测试商品请勿下单','gpt-3.5-turbo,gpt-3.5-turbo-16k',200,0.02,2,1,'2023-10-07 18:45:42','2023-10-07 18:45:42'),
+	(3,1003,'OpenAi 测试商品(3.5&4.0)','测试商品请勿下单','gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4',50,10.00,3,1,'2023-10-07 18:46:41','2023-10-07 18:46:41'),
+	(4,1004,'OpenAi 测试商品(3.5&4.0)','测试商品请勿下单','gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4',100,18.88,3,0,'2023-10-08 09:28:47','2023-10-08 09:28:47');
 
 /*!40000 ALTER TABLE `openai_product` ENABLE KEYS */;
 UNLOCK TABLES;
