@@ -53,6 +53,10 @@
             <groupId>cn.bugstack.chatgpt</groupId>
             <artifactId>chatgpt-sdk-java</artifactId>
         </dependency>
+        <dependency>
+            <groupId>cn.bugstack</groupId>
+            <artifactId>chatglm-sdk-java</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>cn.bugstack</groupId>

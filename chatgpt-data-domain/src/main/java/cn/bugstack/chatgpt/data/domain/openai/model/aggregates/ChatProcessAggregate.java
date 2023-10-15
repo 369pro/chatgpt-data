@@ -3,6 +3,7 @@ package cn.bugstack.chatgpt.data.domain.openai.model.aggregates;
 import cn.bugstack.chatgpt.data.domain.openai.model.entity.MessageEntity;
 import cn.bugstack.chatgpt.data.types.common.Constants;
 import cn.bugstack.chatgpt.data.types.enums.ChatGPTModel;
+import cn.bugstack.chatgpt.data.types.enums.OpenAiChannel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -34,6 +35,10 @@ public class ChatProcessAggregate {
             if (whiteOpenid.equals(openid)) return true;
         }
         return false;
+    }
+
+    public OpenAiChannel getChannel(){
+        return OpenAiChannel.getChannel(this.model);
     }
 
 }
