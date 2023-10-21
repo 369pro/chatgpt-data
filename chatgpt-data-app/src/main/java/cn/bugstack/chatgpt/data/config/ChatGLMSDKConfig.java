@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
- * @description ChatGLMSDKConfig
+ * @description ChatGLMSDKConfig 工厂配置开启
  * @create 2023-10-14 16:00
  */
 @Configuration

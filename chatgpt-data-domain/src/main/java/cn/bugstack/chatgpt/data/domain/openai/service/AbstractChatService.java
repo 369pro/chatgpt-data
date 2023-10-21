@@ -5,20 +5,17 @@ import cn.bugstack.chatgpt.data.domain.openai.model.entity.RuleLogicEntity;
 import cn.bugstack.chatgpt.data.domain.openai.model.entity.UserAccountQuotaEntity;
 import cn.bugstack.chatgpt.data.domain.openai.model.valobj.LogicCheckTypeVO;
 import cn.bugstack.chatgpt.data.domain.openai.repository.IOpenAiRepository;
-import cn.bugstack.chatgpt.data.domain.openai.service.logic.OpenAiGroupService;
-import cn.bugstack.chatgpt.data.domain.openai.service.logic.impl.ChatGLMService;
-import cn.bugstack.chatgpt.data.domain.openai.service.logic.impl.ChatGPTService;
+import cn.bugstack.chatgpt.data.domain.openai.service.channel.OpenAiGroupService;
+import cn.bugstack.chatgpt.data.domain.openai.service.channel.impl.ChatGLMService;
+import cn.bugstack.chatgpt.data.domain.openai.service.channel.impl.ChatGPTService;
 import cn.bugstack.chatgpt.data.domain.openai.service.rule.factory.DefaultLogicFactory;
 import cn.bugstack.chatgpt.data.types.common.Constants;
 import cn.bugstack.chatgpt.data.types.enums.OpenAiChannel;
 import cn.bugstack.chatgpt.data.types.exception.ChatGPTException;
-import cn.bugstack.chatgpt.session.OpenAiSession;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
 import javax.annotation.Resource;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 

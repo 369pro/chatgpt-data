@@ -1,9 +1,9 @@
-package cn.bugstack.chatgpt.data.domain.openai.service.logic.impl;
+package cn.bugstack.chatgpt.data.domain.openai.service.channel.impl;
 
 import cn.bugstack.chatglm.model.*;
 import cn.bugstack.chatglm.session.OpenAiSession;
 import cn.bugstack.chatgpt.data.domain.openai.model.aggregates.ChatProcessAggregate;
-import cn.bugstack.chatgpt.data.domain.openai.service.logic.OpenAiGroupService;
+import cn.bugstack.chatgpt.data.domain.openai.service.channel.OpenAiGroupService;
 import cn.bugstack.chatgpt.data.types.enums.ChatGLMModel;
 import cn.bugstack.chatgpt.data.types.exception.ChatGPTException;
 import com.alibaba.fastjson.JSON;

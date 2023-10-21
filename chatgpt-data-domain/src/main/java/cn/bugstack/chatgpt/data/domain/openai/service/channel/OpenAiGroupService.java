@@ -1,4 +1,4 @@
-package cn.bugstack.chatgpt.data.domain.openai.service.logic;
+package cn.bugstack.chatgpt.data.domain.openai.service.channel;
 
 import cn.bugstack.chatgpt.data.domain.openai.model.aggregates.ChatProcessAggregate;
 import com.fasterxml.jackson.core.JsonProcessingException;

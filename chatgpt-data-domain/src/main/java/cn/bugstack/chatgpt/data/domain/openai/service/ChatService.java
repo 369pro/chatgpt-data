@@ -1,33 +1,17 @@
 package cn.bugstack.chatgpt.data.domain.openai.service;
 
-import cn.bugstack.chatgpt.common.Constants;
 import cn.bugstack.chatgpt.data.domain.openai.model.aggregates.ChatProcessAggregate;
 import cn.bugstack.chatgpt.data.domain.openai.model.entity.RuleLogicEntity;
 import cn.bugstack.chatgpt.data.domain.openai.model.entity.UserAccountQuotaEntity;
 import cn.bugstack.chatgpt.data.domain.openai.model.valobj.LogicCheckTypeVO;
-import cn.bugstack.chatgpt.data.domain.openai.service.logic.impl.ChatGLMService;
-import cn.bugstack.chatgpt.data.domain.openai.service.logic.impl.ChatGPTService;
+import cn.bugstack.chatgpt.data.domain.openai.service.channel.impl.ChatGLMService;
+import cn.bugstack.chatgpt.data.domain.openai.service.channel.impl.ChatGPTService;
 import cn.bugstack.chatgpt.data.domain.openai.service.rule.ILogicFilter;
 import cn.bugstack.chatgpt.data.domain.openai.service.rule.factory.DefaultLogicFactory;
-import cn.bugstack.chatgpt.data.types.exception.ChatGPTException;
-import cn.bugstack.chatgpt.domain.chat.ChatChoice;
-import cn.bugstack.chatgpt.domain.chat.ChatCompletionRequest;
-import cn.bugstack.chatgpt.domain.chat.ChatCompletionResponse;
-import cn.bugstack.chatgpt.domain.chat.Message;
-import com.alibaba.fastjson.JSON;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import okhttp3.sse.EventSource;
-import okhttp3.sse.EventSourceListener;
-import org.apache.commons.lang3.StringUtils;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
-import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
 import javax.annotation.Resource;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
