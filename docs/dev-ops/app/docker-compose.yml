@@ -1,0 +1,29 @@
+# /usr/local/bin/docker-compose -f /docs/dev-ops/environment/environment-docker-compose.yml up -d
+version: '3.8'
+# docker-compose -f environment-docker-compose.yml up -d
+services:
+  chatgpt-data-app:
+    image: fuzhengwei/chatgpt-data-app:1.1
+    container_name: chatgpt-data-app
+    ports:
+      - "8091:8091"
+    environment:
+      - TZ=PRC
+      - SERVER_PORT=8091
+      - APP_CONFIG_API_VERSION=v1
+      - APP_CONFIG_CROSS_ORIGIN=*
+    volumes:
+      - ./log:/var/log/x-api-app
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+
+  chatgpt-web:
+    container_name: chatgpt-web
+    image: fuzhengwei/chatgpt-web:0.1.1
+    ports:
+      - "3000:3000"
+    restart: always
