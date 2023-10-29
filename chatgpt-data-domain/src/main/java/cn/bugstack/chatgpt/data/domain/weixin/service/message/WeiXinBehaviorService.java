@@ -33,7 +33,7 @@ public class WeiXinBehaviorService implements IWeiXinBehaviorService {
      * 2. 用户行为、消息类型，是多样性的，这部分如果用户有更多的扩展需求，可以使用设计模式【模板模式 + 策略模式 + 工厂模式】，分拆逻辑。
      */
     @Override
-    public String acceptUserBehavior(UserBehaviorMessageEntity userBehaviorMessageEntity) {
+    public synchronized String acceptUserBehavior(UserBehaviorMessageEntity userBehaviorMessageEntity) {
         // Event 事件类型，忽略处理
         if (MsgTypeVO.EVENT.getCode().equals(userBehaviorMessageEntity.getMsgType())) {
             return "";
