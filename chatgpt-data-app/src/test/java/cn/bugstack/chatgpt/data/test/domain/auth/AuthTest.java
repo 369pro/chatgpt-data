@@ -40,5 +40,4 @@ public class AuthTest {
         authService.checkToken(authStateEntity.getToken());
     }
 
-
 }

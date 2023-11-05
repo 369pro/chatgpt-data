@@ -19,7 +19,7 @@ curl -X POST \
 curl -X POST \
 http://localhost:8091/api/v1/auth/login \
 -H 'Content-Type: application/x-www-form-urlencoded' \
--d 'code=9212'
+-d 'code=3528'
 ```
 
 - 登录后可以获取 Token

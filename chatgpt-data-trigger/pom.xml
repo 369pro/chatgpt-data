@@ -37,6 +37,11 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson-spring-boot-starter</artifactId>
+        </dependency>
+
         <!-- chatgpt-sdk-java https://gitcode.net/KnowledgePlanet/chatgpt/chatgpt-sdk-java-->
         <dependency>
             <groupId>cn.bugstack.chatgpt</groupId>

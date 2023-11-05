@@ -2,6 +2,7 @@ package cn.bugstack.chatgpt.data.domain.auth.service;
 
 import cn.bugstack.chatgpt.data.domain.auth.model.entity.AuthStateEntity;
 import cn.bugstack.chatgpt.data.domain.auth.model.valobj.AuthTypeVO;
+import cn.bugstack.chatgpt.data.domain.auth.repository.IAuthRepository;
 import com.google.common.cache.Cache;
 import io.jsonwebtoken.Claims;
 import lombok.extern.slf4j.Slf4j;
@@ -21,11 +22,13 @@ public class AuthService extends AbstractAuthService {
 
     @Resource
     private Cache<String, String> codeCache;
+    @Resource
+    private IAuthRepository repository;
 
     @Override
     protected AuthStateEntity checkCode(String code) {
         // 获取验证码校验
-        String openId = codeCache.getIfPresent(code);
+        String openId = repository.getCodeUserOpenId(code);
         if (StringUtils.isBlank(openId)){
             log.info("鉴权，用户收入的验证码不存在 {}", code);
             return AuthStateEntity.builder()
@@ -34,10 +37,8 @@ public class AuthService extends AbstractAuthService {
                     .build();
         }
 
-
         // 移除缓存Key值
-        codeCache.invalidate(openId);
-        codeCache.invalidate(code);
+        repository.removeCodeByOpenId(code, openId);
 
         // 验证码校验成功
         return AuthStateEntity.builder()

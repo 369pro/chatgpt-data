@@ -34,7 +34,7 @@ public abstract class AbstractAuthService implements IAuthService {
     public AuthStateEntity doLogin(String code) {
 
         // 1. 如果不是4位有效数字字符串，则返回验证码无效
-        if (!code.matches("\\d{4}")) {
+        if (!code.matches("\\d{4,8}")) {
             log.info("鉴权，用户收入的验证码无效 {}", code);
             return AuthStateEntity.builder()
                     .code(AuthTypeVO.A0002.getCode())

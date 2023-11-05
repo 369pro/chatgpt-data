@@ -23,7 +23,7 @@ services:
 
   chatgpt-web:
     container_name: chatgpt-web
-    image: fuzhengwei/chatgpt-web:0.1.1
+    image: fuzhengwei/chatgpt-web:5.2
     ports:
       - "3000:3000"
     restart: always
