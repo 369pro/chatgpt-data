@@ -3,20 +3,25 @@ package cn.bugstack.chatgpt.data.domain.openai.service.channel.impl;
 import cn.bugstack.chatglm.model.*;
 import cn.bugstack.chatglm.session.OpenAiSession;
 import cn.bugstack.chatgpt.data.domain.openai.model.aggregates.ChatProcessAggregate;
+import cn.bugstack.chatgpt.data.domain.openai.model.entity.MessageEntity;
 import cn.bugstack.chatgpt.data.domain.openai.service.channel.OpenAiGroupService;
 import cn.bugstack.chatgpt.data.types.enums.ChatGLMModel;
 import cn.bugstack.chatgpt.data.types.exception.ChatGPTException;
 import com.alibaba.fastjson.JSON;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.sse.EventSource;
 import okhttp3.sse.EventSourceListener;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
 import javax.annotation.Resource;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -28,18 +33,51 @@ import java.util.stream.Collectors;
 @Service
 public class ChatGLMService implements OpenAiGroupService {
 
-    @Resource
+    @Autowired(required = false)
     protected OpenAiSession chatGlMOpenAiSession;
 
     @Override
-    public void doMessageResponse(ChatProcessAggregate chatProcess, ResponseBodyEmitter emitter) throws JsonProcessingException {
+    public void doMessageResponse(ChatProcessAggregate chatProcess, ResponseBodyEmitter emitter) throws IOException {
+        if (null == chatGlMOpenAiSession) {
+            emitter.send("ChatGLM 通道，模型调用未开启！");
+            return;
+        }
+
         // 1. 请求消息
-        List<ChatCompletionRequest.Prompt> prompts = chatProcess.getMessages().stream()
-                .map(entity -> ChatCompletionRequest.Prompt.builder()
+        List<ChatCompletionRequest.Prompt> prompts = new ArrayList<>();
+
+        List<MessageEntity> messages = chatProcess.getMessages();
+        MessageEntity messageEntity = messages.remove(messages.size() - 1);
+
+        for (MessageEntity message : messages) {
+            String role = message.getRole();
+            if (Objects.equals(role, Role.system.getCode())) {
+                prompts.add(ChatCompletionRequest.Prompt.builder()
+                        .role(Role.system.getCode())
+                        .content(message.getContent())
+                        .build());
+
+                prompts.add(ChatCompletionRequest.Prompt.builder()
                         .role(Role.user.getCode())
-                        .content(entity.getContent())
-                        .build())
-                .collect(Collectors.toList());
+                        .content("Okay")
+                        .build());
+            } else {
+                prompts.add(ChatCompletionRequest.Prompt.builder()
+                        .role(Role.user.getCode())
+                        .content(message.getContent())
+                        .build());
+
+                prompts.add(ChatCompletionRequest.Prompt.builder()
+                        .role(Role.user.getCode())
+                        .content("Okay")
+                        .build());
+            }
+        }
+
+        prompts.add(ChatCompletionRequest.Prompt.builder()
+                .role(messageEntity.getRole())
+                .content(messageEntity.getContent())
+                .build());
 
         // 2. 封装参数
         ChatCompletionRequest request = new ChatCompletionRequest();
@@ -52,7 +90,7 @@ public class ChatGLMService implements OpenAiGroupService {
                 ChatCompletionResponse response = JSON.parseObject(data, ChatCompletionResponse.class);
 
                 // 发送信息
-                if (EventType.add.getCode().equals(type)){
+                if (EventType.add.getCode().equals(type)) {
                     try {
                         emitter.send(response.getData());
                     } catch (Exception e) {

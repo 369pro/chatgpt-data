@@ -12,11 +12,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "chatgpt.sdk.config", ignoreInvalidFields = true)
 public class ChatGPTSDKConfigProperties {
 
+    /** 状态；open = 开启、close 关闭 */
+    private boolean enable;
     /** 转发地址 <a href="https://api.xfg.im/b8b6/">https://api.xfg.im/b8b6/</a> */
     private String apiHost;
     /** 可以申请 sk-*** */
     private String apiKey;
-    /** 获取Token <a href="http://api.xfg.im:8080/authorize?username=xfg&password=123">访问获取</a> */
+    /** 获取Token 仅为验证auth课程使用，后续已废弃 */
+    @Deprecated
     private String authToken;
 
 }

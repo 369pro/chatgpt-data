@@ -4,6 +4,8 @@ import cn.bugstack.chatgpt.data.domain.openai.model.aggregates.ChatProcessAggreg
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
+import java.io.IOException;
+
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
  * @description 服务组
@@ -11,6 +13,6 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter
  */
 public interface OpenAiGroupService {
 
-    void doMessageResponse(ChatProcessAggregate chatProcess, ResponseBodyEmitter emitter) throws JsonProcessingException;
+    void doMessageResponse(ChatProcessAggregate chatProcess, ResponseBodyEmitter emitter) throws IOException;
 
 }
