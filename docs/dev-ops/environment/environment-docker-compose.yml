@@ -49,7 +49,6 @@ services:
     ports:
       - 8899:80
     environment:
-      - PMA_ARBITRARY=1
       - PMA_HOST=mysql
       - PMA_PORT=3306
       - MYSQL_ROOT_PASSWORD=123456
@@ -82,7 +81,7 @@ services:
     restart: always
     hostname: redis
     ports:
-      - 6379:6379
+      - 16379:6379
     volumes:
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
     command: redis-server /usr/local/etc/redis/redis.conf
@@ -93,6 +92,46 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+
+  chatgpt-data-app:
+    image: fuzhengwei/chatgpt-data-app:1.1
+    container_name: chatgpt-data-app
+    ports:
+      - "8091:8091"
+    environment:
+      - TZ=PRC
+      - SERVER_PORT=8091
+      - APP_CONFIG_API_VERSION=v1
+      - APP_CONFIG_CROSS_ORIGIN=*
+      - APP_CONFIG_LIMIT_COUNT=3
+      - APP_CONFIG_WHITE_LIST=ojbZUv18lbmriaTjcCWBYkOrSbHA
+      - CHATGLM_SDK_CONFIG_ENABLED=true
+      - CHATGLM_SDK_CONFIG_API_HOST=https://open.bigmodel.cn/
+      - CHATGLM_SDK_CONFIG_API_KEY=REDACTED
+    volumes:
+      - ./log:/var/log/x-api-app
+    networks:
+      - my-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+
+  chatgpt-web-app:
+    container_name: chatgpt-web-app
+    image: fuzhengwei/chatgpt-web-app:1.0
+    ports:
+      - "80:3002"
+    networks:
+      - my-network
+    restart: always
 
 networks:
   my-network:
