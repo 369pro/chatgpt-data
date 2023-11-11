@@ -23,7 +23,7 @@ wxpay:
     # 商户号
     mchid:
     # 回调地址
-    notify-url: http://你的地址.natapp1.cc/api/v1/mall/pay_notify
+    notify-url: http://api.gaga.plus/api/v1/mall/pay_notify
     # 商户API私钥路径
     private-key-path: cert/apiclient_key.pem
     # 商户证书序列号：openssl x509 -in apiclient_cert.pem -noout -serial
@@ -78,7 +78,7 @@ wx:
 spring:
   datasource:
     username: root
-    password: 123456
+    password: REDACTED
     url: jdbc:mysql://mysql:3306/openai?useUnicode=true&characterEncoding=utf8&autoReconnect=true&zeroDateTimeBehavior=convertToNull&serverTimezone=UTC&useSSL=true
     driver-class-name: com.mysql.cj.jdbc.Driver
   hikari:
