@@ -1,6 +1,23 @@
 # 命令执行 docker-compose up -d
+# docker-compose -f environment-docker-compose.yml up -d
 version: '3.9'
 services:
+  # yum install -y httpd-tools
+  nginx:
+    image: nginx:1.25.3
+    container_name: nginx
+    restart: always
+    ports:
+      - '443:443'
+      - '80:80'
+    volumes:
+      - ./nginx/logs:/var/log/nginx
+      - ./nginx/html:/usr/share/nginx/html
+      - ./nginx/conf/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/conf/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl/
+    privileged: true
+
   mysql:
     image: mysql:8.0.32
     container_name: mysql
@@ -9,9 +26,9 @@ services:
     environment:
       TZ: Asia/Shanghai
       # MYSQL_ALLOW_EMPTY_PASSWORD: 'yes' # 可配置无密码，注意配置 SPRING_DATASOURCE_PASSWORD=
-      MYSQL_ROOT_PASSWORD: 123456
-      MYSQL_USER: xfg
-      MYSQL_PASSWORD: 123456
+      MYSQL_ROOT_PASSWORD: REDACTED
+      # MYSQL_USER: xfg
+      # MYSQL_PASSWORD: !@QW12qw
     networks:
       - my-network
     depends_on:
@@ -26,11 +43,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 15s
-    deploy:
-      resources:
-        limits:
-          cpus: '1.00'
-          memory: 512M
     volumes_from:
       - mysql-job-dbdata
 
@@ -51,7 +63,7 @@ services:
     environment:
       - PMA_HOST=mysql
       - PMA_PORT=3306
-      - MYSQL_ROOT_PASSWORD=123456
+      - MYSQL_ROOT_PASSWORD=REDACTED
     depends_on:
       mysql:
         condition: service_healthy
@@ -68,6 +80,8 @@ services:
       - 8081:8081
     environment:
       - REDIS_HOSTS=local:redis:6379
+      - HTTP_USER=admin
+      - HTTP_PASSWORD=admin
     networks:
       - my-network
     depends_on:
@@ -80,6 +94,7 @@ services:
     container_name: redis
     restart: always
     hostname: redis
+    privileged: true
     ports:
       - 16379:6379
     volumes:
@@ -94,7 +109,7 @@ services:
       retries: 3
 
   chatgpt-data-app:
-    image: fuzhengwei/chatgpt-data-app:1.1
+    image: fuzhengwei/chatgpt-data-app:1.4
     container_name: chatgpt-data-app
     ports:
       - "8091:8091"
@@ -103,8 +118,12 @@ services:
       - SERVER_PORT=8091
       - APP_CONFIG_API_VERSION=v1
       - APP_CONFIG_CROSS_ORIGIN=*
-      - APP_CONFIG_LIMIT_COUNT=3
+      - APP_CONFIG_LIMIT_COUNT=10
       - APP_CONFIG_WHITE_LIST=ojbZUv18lbmriaTjcCWBYkOrSbHA
+      - WXPAY_CONFIG_ENABLED=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=REDACTED
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/openai?useUnicode=true&characterEncoding=utf8&autoReconnect=true&zeroDateTimeBehavior=convertToNull&serverTimezone=UTC&useSSL=true
       - CHATGLM_SDK_CONFIG_ENABLED=true
       - CHATGLM_SDK_CONFIG_API_HOST=https://open.bigmodel.cn/
       - CHATGLM_SDK_CONFIG_API_KEY=REDACTED
@@ -126,9 +145,9 @@ services:
 
   chatgpt-web-app:
     container_name: chatgpt-web-app
-    image: fuzhengwei/chatgpt-web-app:1.0
+    image: fuzhengwei/chatgpt-web-app:1.2
     ports:
-      - "80:3002"
+      - "3002:3002"
     networks:
       - my-network
     restart: always

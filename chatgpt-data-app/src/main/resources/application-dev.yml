@@ -46,6 +46,8 @@ thread:
 chatgpt:
   sdk:
     config:
+      # 状态；true = 开启、false 关闭
+      enabled: false
       # 官网地址 https://api.openai.com/ 1美金:7人民币
       api-host: https://pro-share-api.zcyai.com/
       # 官网申请 https://platform.openai.com/account/api-keys

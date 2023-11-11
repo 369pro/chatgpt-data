@@ -1,5 +1,6 @@
 package cn.bugstack.chatgpt.data.infrastructure.repository;
 
+import cn.bugstack.chatgpt.data.domain.openai.model.valobj.UserAccountStatusVO;
 import cn.bugstack.chatgpt.data.domain.order.model.aggregates.CreateOrderAggregate;
 import cn.bugstack.chatgpt.data.domain.order.model.entity.*;
 import cn.bugstack.chatgpt.data.domain.order.model.valobj.OrderStatusVO;
@@ -149,6 +150,8 @@ public class OrderRepository implements IOrderRepository {
             int addAccountQuotaCount = userAccountDao.addAccountQuota(userAccountPOReq);
             if (1 != addAccountQuotaCount) throw new RuntimeException("addAccountQuotaCount update count is not equal 1");
         } else {
+            userAccountPOReq.setStatus(UserAccountStatusVO.AVAILABLE.getCode());
+            userAccountPOReq.setModelTypes("gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4,chatglm_lite,chatglm_std,chatglm_pro");
             userAccountDao.insert(userAccountPOReq);
         }
     }
