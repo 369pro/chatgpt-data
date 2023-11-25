@@ -41,3 +41,5 @@ build/
 /chatgpt-data-app/data/
 /docs/draw.io/*.bkp
 /docs/app/log/
+/chatgpt-data-app/src/main/resources/cert/apiclient_key.pem
+/chatgpt-data-app/src/main/resources/application-prod.yml

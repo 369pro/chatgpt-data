@@ -5,7 +5,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter
 
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
- * @description
+ * @description OpenAi 应答请求
  * @create 2023-07-22 20:53
  */
 public interface IChatService {

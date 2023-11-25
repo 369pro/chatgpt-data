@@ -17,19 +17,19 @@ app:
 wxpay:
   config:
     # 状态；true = 开启、false 关闭
-    enabled: false
+    enabled: true
     # 申请支付主体的 appid
-    appid:
+    appid: wx4bd388e42758df34
     # 商户号
-    mchid:
+    mchid: 1649876094
     # 回调地址
     notify-url: http://api.gaga.plus/api/v1/mall/pay_notify
     # 商户API私钥路径
     private-key-path: cert/apiclient_key.pem
     # 商户证书序列号：openssl x509 -in apiclient_cert.pem -noout -serial
-    merchant-serial-number:
+    merchant-serial-number: 3D1FE714D0FE79E87139D4FF9782AD98A5103D30
     # 商户APIV3密钥
-    api-v3-key:
+    api-v3-key: REDACTED
 
 # 线程池配置
 thread:

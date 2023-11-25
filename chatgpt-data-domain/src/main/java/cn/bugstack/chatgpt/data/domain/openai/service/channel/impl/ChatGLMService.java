@@ -39,7 +39,7 @@ public class ChatGLMService implements OpenAiGroupService {
     @Override
     public void doMessageResponse(ChatProcessAggregate chatProcess, ResponseBodyEmitter emitter) throws IOException {
         if (null == chatGlMOpenAiSession) {
-            emitter.send("ChatGLM 通道，模型调用未开启！");
+            emitter.send("ChatGLM 通道，模型调用未开启，可以选择其他模型对话！");
             return;
         }
 
