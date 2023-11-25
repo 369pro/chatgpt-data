@@ -35,7 +35,7 @@ public class ChatServiceTest {
 
         ChatProcessAggregate chatProcessAggregate = new ChatProcessAggregate();
         chatProcessAggregate.setOpenid("xfg");
-        chatProcessAggregate.setModel(ChatGPTModel.DALL_E_3.getCode());
+        chatProcessAggregate.setModel(ChatGPTModel.DALL_E_2.getCode());
         chatProcessAggregate.setMessages(Collections.singletonList(MessageEntity.builder().role(Constants.Role.USER.getCode()).content("画一个小狗").build()));
 
         ResponseBodyEmitter completions = chatService.completions(emitter, chatProcessAggregate);
