@@ -1,5 +1,14 @@
 server:
   port: 8091
+  # 1核2G内存，线程数经验值200；4核8G内存【accept-count=1000、max-threads=800、max-connections=10000】，线程数经验值800。线程池过大，cpu调度会消耗大量时间
+  tomcat:
+    mbeanregistry:
+      enabled: true
+    max-connections: 100
+    threads:
+      max: 100        # 设定处理客户请求的线程的最大数目，决定了服务器可以同时响应客户请求的数,默认200
+      min-spare: 50   # 初始化线程数,最小空闲线程数,默认是10
+    accept-count: 10  # 等待队列长度
 
 # 应用配置
 app:
@@ -19,17 +28,17 @@ wxpay:
     # 状态；true = 开启、false 关闭
     enabled: true
     # 申请支付主体的 appid
-    appid: wx4bd388e42758df34
+    appid:
     # 商户号
-    mchid: 1649876094
+    mchid:
     # 回调地址
     notify-url: http://api.gaga.plus/api/v1/mall/pay_notify
     # 商户API私钥路径
     private-key-path: cert/apiclient_key.pem
     # 商户证书序列号：openssl x509 -in apiclient_cert.pem -noout -serial
-    merchant-serial-number: 3D1FE714D0FE79E87139D4FF9782AD98A5103D30
+    merchant-serial-number:
     # 商户APIV3密钥
-    api-v3-key: REDACTED
+    api-v3-key:
 
 # 线程池配置
 thread:
