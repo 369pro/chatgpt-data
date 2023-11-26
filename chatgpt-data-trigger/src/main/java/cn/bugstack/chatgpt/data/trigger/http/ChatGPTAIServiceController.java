@@ -9,6 +9,8 @@ import cn.bugstack.chatgpt.data.types.common.Constants;
 import cn.bugstack.chatgpt.data.types.exception.ChatGPTException;
 import cn.bugstack.chatgpt.data.types.model.Response;
 import com.alibaba.fastjson.JSON;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
@@ -67,6 +69,10 @@ public class ChatGPTAIServiceController {
      * "model": "gpt-3.5-turbo"
      * }'
      */
+    @HystrixCommand(commandProperties = {
+            @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "5500")
+    }, fallbackMethod = "completionsStreamError"
+    )
     @RequestMapping(value = "chat/completions", method = RequestMethod.POST)
     public ResponseBodyEmitter completionsStream(@RequestBody ChatGPTRequestDTO request, @RequestHeader("Authorization") String token, HttpServletResponse response) {
         log.info("流式问答请求开始，使用模型：{} 请求信息：{}", request.getModel(), JSON.toJSONString(request.getMessages()));
@@ -113,6 +119,18 @@ public class ChatGPTAIServiceController {
             log.error("流式应答，请求模型：{} 发生异常", request.getModel(), e);
             throw new ChatGPTException(e.getMessage());
         }
+    }
+
+    public ResponseBodyEmitter completionsStreamError(@RequestBody ChatGPTRequestDTO request, @RequestHeader("Authorization") String token, HttpServletResponse response) throws IOException {
+        response.setContentType("text/event-stream");
+        response.setCharacterEncoding("UTF-8");
+        response.setHeader("Cache-Control", "no-cache");
+
+        ResponseBodyEmitter emitter = new ResponseBodyEmitter();
+        emitter.send("【错误编码】502"+ "\r\n");
+        emitter.send("【错误提示】网络超时，请重新对话尝试。");
+        emitter.complete();
+        return emitter;
     }
 
 }
