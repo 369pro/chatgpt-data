@@ -69,7 +69,7 @@ CREATE TABLE `openai_product` (
   `product_id` int(4) NOT NULL COMMENT '商品ID',
   `product_name` varchar(32) NOT NULL COMMENT '商品名称',
   `product_desc` varchar(128) NOT NULL COMMENT '商品描述',
-  `product_model_types` varchar(128) DEFAULT NULL COMMENT '可用模型；gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4,gpt-4-32k',
+  `product_model_types` varchar(256) DEFAULT NULL COMMENT '可用模型；gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4,gpt-4-32k',
   `quota` int(8) NOT NULL COMMENT '额度次数',
   `price` decimal(10,2) NOT NULL COMMENT '商品价格',
   `sort` int(4) NOT NULL COMMENT '商品排序',
@@ -83,12 +83,11 @@ CREATE TABLE `openai_product` (
 LOCK TABLES `openai_product` WRITE;
 /*!40000 ALTER TABLE `openai_product` DISABLE KEYS */;
 
-INSERT INTO `openai_product` (`id`, `product_id`, `product_name`, `product_desc`, `product_model_types`, `quota`, `price`, `sort`, `is_enabled`, `create_time`, `update_time`)
-VALUES
-	(1,1001,'OpenAi 测试商品(3.5)','测试商品请勿下单','gpt-3.5-turbo,gpt-3.5-turbo-16k',100,0.01,1,1,'2023-10-07 18:45:36','2023-10-07 18:45:36'),
-	(2,1002,'OpenAi 测试商品(3.5)','测试商品请勿下单','gpt-3.5-turbo,gpt-3.5-turbo-16k',200,0.02,2,1,'2023-10-07 18:45:42','2023-10-07 18:45:42'),
-	(3,1003,'OpenAi 测试商品(3.5&4.0)','测试商品请勿下单','gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4',50,10.00,3,1,'2023-10-07 18:46:41','2023-10-07 18:46:41'),
-	(4,1004,'OpenAi 测试商品(3.5&4.0)','测试商品请勿下单','gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4',100,18.88,3,0,'2023-10-08 09:28:47','2023-10-08 09:28:47');
+INSERT INTO `openai_product` (`id`, `product_id`, `product_name`, `product_desc`, `product_model_types`, `quota`, `price`, `sort`, `is_enabled`, `create_time`, `update_time`) VALUES
+(1, 1001, 'OpenAi 测试商品(3.5)', '测试商品请勿下单', 'gpt-3.5-turbo,gpt-3.5-turbo-16k,chatGLM_6b_SSE,chatglm_lite,chatglm_lite_32k,chatglm_std,chatglm_pro,chatglm_turbo,dall-e-2,dall-e-3', 2, 0.01, 1, 1, '2023-11-25 15:41:29', '2023-11-25 15:41:29'),
+(2, 1002, 'OpenAi 测试商品(3.5)', '测试商品请勿下单', 'gpt-3.5-turbo,gpt-3.5-turbo-16k,chatGLM_6b_SSE,chatglm_lite,chatglm_lite_32k,chatglm_std,chatglm_pro,chatglm_turbo,dall-e-2,dall-e-3', 5, 1.00, 2, 1, '2023-11-25 15:41:33', '2023-11-25 15:41:33'),
+(3, 1003, 'OpenAi 测试商品(3.5&4.0)', '测试商品请勿下单', 'gpt-4,gpt-3.5-turbo,gpt-3.5-turbo-16k,chatGLM_6b_SSE,chatglm_lite,chatglm_lite_32k,chatglm_std,chatglm_pro,chatglm_turbo,dall-e-2,dall-e-3', 10, 9.99, 3, 1, '2023-11-25 15:41:35', '2023-11-25 15:41:35'),
+(4, 1004, 'OpenAi 测试商品(3.5&4.0)', '测试商品请勿下单', 'gpt-4,gpt-3.5-turbo,gpt-3.5-turbo-16k,chatGLM_6b_SSE,chatglm_lite,chatglm_lite_32k,chatglm_std,chatglm_pro,chatglm_turbo,dall-e-2,dall-e-3', 50, 18.88, 3, 0, '2023-11-25 15:41:40', '2023-11-25 15:41:40');
 
 /*!40000 ALTER TABLE `openai_product` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -104,7 +103,7 @@ CREATE TABLE `user_account` (
   `openid` varchar(64) NOT NULL COMMENT '用户ID；这里用的是微信ID作为唯一ID，你也可以给用户创建唯一ID，之后绑定微信ID',
   `total_quota` int(11) NOT NULL DEFAULT '0' COMMENT '总量额度；分配的总使用次数',
   `surplus_quota` int(11) NOT NULL DEFAULT '0' COMMENT '剩余额度；剩余的可使用次数',
-  `model_types` varchar(128) NOT NULL COMMENT '可用模型；gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4,gpt-4-32k',
+  `model_types` varchar(256) NOT NULL COMMENT '可用模型；gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4,gpt-4-32k',
   `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '账户状态；0-可用、1-冻结',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
