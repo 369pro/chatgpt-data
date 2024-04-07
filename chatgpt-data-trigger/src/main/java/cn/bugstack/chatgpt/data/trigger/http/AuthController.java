@@ -33,6 +33,10 @@ public class AuthController {
     @Resource
     private IWeiXinBehaviorService weiXinBehaviorService;
 
+    public AuthController() {
+        log.info("启动 AuthController");
+    }
+
     /**
      * 生成验证码，用于测试使用
      * <p>
