@@ -34,7 +34,7 @@ public class ChatGPTService implements OpenAiGroupService {
     }
 
     @Override
-    public void doMessageResponse(ChatProcessAggregate chatProcess, ResponseBodyEmitter emitter) throws IOException {
+    public void doMessageResponse(ChatProcessAggregate chatProcess, ResponseBodyEmitter emitter) throws Exception {
         GenerativeModelVO generativeModelVO = chatProcess.getGenerativeModelVO();
         generativeModelGroup.get(generativeModelVO).doMessageResponse(chatProcess, emitter);
     }
