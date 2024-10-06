@@ -145,5 +145,9 @@ public class RedissonService implements IRedisService {
         return redissonClient.getBloomFilter(key);
     }
 
+    @Override
+    public RTransaction createTransaction(TransactionOptions options) {
+        return redissonClient.createTransaction(options);
+    }
 
 }

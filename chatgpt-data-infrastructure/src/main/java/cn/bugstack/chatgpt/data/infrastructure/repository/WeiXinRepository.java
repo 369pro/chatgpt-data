@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.redisson.api.RLock;
+import org.redisson.api.RTransaction;
+import org.redisson.api.TransactionOptions;
 import org.springframework.stereotype.Repository;
 
 import javax.annotation.Resource;
@@ -50,10 +52,23 @@ public class WeiXinRepository implements IWeiXinRepository {
                 }
             }
 
-            // 存储值【3分钟有效期】
-            redisService.setValue(Key + "_" + code, openId, 3 * 60 * 1000);
-            redisService.setValue(Key + "_" + openId, code, 3 * 60 * 1000);
+            // 创建一个事务选项实例，设置事务超时等参数
+            TransactionOptions options = TransactionOptions.defaults()
+                    .timeout(3, TimeUnit.SECONDS);
 
+            // 开始一个事务
+            RTransaction transaction = redisService.createTransaction(options);
+            try {
+                // 存储值【3分钟有效期】
+                redisService.setValue(Key + "_" + code, openId, 3 * 60 * 1000);
+                redisService.setValue(Key + "_" + openId, code, 3 * 60 * 1000);
+                // 提交事务
+                transaction.commit();
+            } catch (Exception e) {
+                // 如果有异常发生，回滚事务
+                transaction.rollback();
+                e.printStackTrace();
+            }
             return code;
         } finally {
             lock.unlock();

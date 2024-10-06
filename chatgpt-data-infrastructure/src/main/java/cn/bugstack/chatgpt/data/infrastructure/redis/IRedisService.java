@@ -228,4 +228,6 @@ public interface IRedisService {
      */
     <T> RBloomFilter<T> getBloomFilter(String key);
 
+    RTransaction createTransaction(TransactionOptions options);
+
 }
