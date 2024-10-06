@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="cn.bugstack.chatgpt.data.infrastructure.dao.IOpenAIOrderDao">
 
-    <resultMap id="userAccountMap" type="cn.bugstack.chatgpt.data.infrastructure.po.OpenAIOrderPO">
+    <resultMap id="userAccountMap" type="cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIOrderPO">
         <id column="id" property="id"/>
         <result column="openid" property="openid"/>
         <result column="product_id" property="productId"/>
@@ -22,7 +22,7 @@
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
-    <insert id="insert" parameterType="cn.bugstack.chatgpt.data.infrastructure.po.OpenAIOrderPO">
+    <insert id="insert" parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIOrderPO">
         INSERT INTO openai_order(
         openid, product_id, product_name, product_quota, order_id,
         order_time, order_status, total_amount, pay_type, pay_status,
@@ -34,7 +34,7 @@
         )
     </insert>
 
-    <select id="queryUnpaidOrder" parameterType="cn.bugstack.chatgpt.data.infrastructure.po.OpenAIOrderPO"
+    <select id="queryUnpaidOrder" parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIOrderPO"
             resultMap="userAccountMap">
         SELECT order_id, product_name, pay_url, pay_status, total_amount
         FROM openai_order
@@ -43,7 +43,7 @@
         LIMIT 1
     </select>
 
-    <update id="updateOrderPayInfo" parameterType="cn.bugstack.chatgpt.data.infrastructure.po.OpenAIOrderPO">
+    <update id="updateOrderPayInfo" parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIOrderPO">
         UPDATE openai_order SET
         pay_url = #{payUrl},
         pay_status = #{payStatus},
@@ -51,7 +51,7 @@
         WHERE openid = #{openid} AND order_id = #{orderId}
     </update>
 
-    <update id="changeOrderPaySuccess" parameterType="cn.bugstack.chatgpt.data.infrastructure.po.OpenAIOrderPO">
+    <update id="changeOrderPaySuccess" parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIOrderPO">
         UPDATE openai_order SET
         order_status = 1, pay_status = 1,
         pay_amount = #{payAmount},
@@ -97,7 +97,7 @@
     </select>
 
 
-    <update id="changeOrderClose" parameterType="cn.bugstack.chatgpt.data.infrastructure.po.OpenAIOrderPO">
+    <update id="changeOrderClose" parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIOrderPO">
         UPDATE openai_order SET
         order_status = 3, pay_status = 3,
         update_time = now()

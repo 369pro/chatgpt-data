@@ -1,6 +1,6 @@
 package cn.bugstack.chatgpt.data.infrastructure.dao;
 
-import cn.bugstack.chatgpt.data.infrastructure.po.OpenAIProductPO;
+import cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIProductPO;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;

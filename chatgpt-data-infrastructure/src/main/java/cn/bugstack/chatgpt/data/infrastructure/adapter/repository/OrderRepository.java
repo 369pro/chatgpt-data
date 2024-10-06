@@ -1,4 +1,4 @@
-package cn.bugstack.chatgpt.data.infrastructure.repository;
+package cn.bugstack.chatgpt.data.infrastructure.adapter.repository;
 
 import cn.bugstack.chatgpt.data.domain.openai.model.valobj.UserAccountStatusVO;
 import cn.bugstack.chatgpt.data.domain.order.model.aggregates.CreateOrderAggregate;
@@ -9,9 +9,9 @@ import cn.bugstack.chatgpt.data.domain.order.repository.IOrderRepository;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IOpenAIOrderDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IOpenAIProductDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IUserAccountDao;
-import cn.bugstack.chatgpt.data.infrastructure.po.OpenAIOrderPO;
-import cn.bugstack.chatgpt.data.infrastructure.po.OpenAIProductPO;
-import cn.bugstack.chatgpt.data.infrastructure.po.UserAccountPO;
+import cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIOrderPO;
+import cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIProductPO;
+import cn.bugstack.chatgpt.data.infrastructure.dao.po.UserAccountPO;
 import cn.bugstack.chatgpt.data.types.enums.OpenAIProductEnableModel;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Isolation;

@@ -1,10 +1,10 @@
-package cn.bugstack.chatgpt.data.infrastructure.repository;
+package cn.bugstack.chatgpt.data.infrastructure.adapter.repository;
 
 import cn.bugstack.chatgpt.data.domain.openai.model.entity.UserAccountQuotaEntity;
 import cn.bugstack.chatgpt.data.domain.openai.model.valobj.UserAccountStatusVO;
 import cn.bugstack.chatgpt.data.domain.openai.repository.IOpenAiRepository;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IUserAccountDao;
-import cn.bugstack.chatgpt.data.infrastructure.po.UserAccountPO;
+import cn.bugstack.chatgpt.data.infrastructure.dao.po.UserAccountPO;
 import org.springframework.stereotype.Repository;
 
 import javax.annotation.Resource;

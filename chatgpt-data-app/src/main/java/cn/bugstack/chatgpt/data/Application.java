@@ -3,6 +3,7 @@ package cn.bugstack.chatgpt.data;
 import org.springframework.beans.factory.annotation.Configurable;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.ImportResource;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -13,6 +14,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @Configurable
 @EnableScheduling
+@ImportResource(locations = {"classpath:spring-config.xml"})
 public class Application {
 
     public static void main(String[] args){

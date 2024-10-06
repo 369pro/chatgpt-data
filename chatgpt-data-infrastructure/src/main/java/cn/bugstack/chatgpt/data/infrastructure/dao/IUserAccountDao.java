@@ -1,6 +1,6 @@
 package cn.bugstack.chatgpt.data.infrastructure.dao;
 
-import cn.bugstack.chatgpt.data.infrastructure.po.UserAccountPO;
+import cn.bugstack.chatgpt.data.infrastructure.dao.po.UserAccountPO;
 import org.apache.ibatis.annotations.Mapper;
 
 /**

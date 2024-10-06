@@ -1,4 +1,4 @@
-package cn.bugstack.chatgpt.data.infrastructure.repository;
+package cn.bugstack.chatgpt.data.infrastructure.adapter.repository;
 
 import cn.bugstack.chatgpt.data.domain.auth.repository.IAuthRepository;
 import cn.bugstack.chatgpt.data.infrastructure.redis.IRedisService;

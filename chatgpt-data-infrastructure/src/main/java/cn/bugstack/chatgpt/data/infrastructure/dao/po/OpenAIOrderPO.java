@@ -1,4 +1,4 @@
-package cn.bugstack.chatgpt.data.infrastructure.po;
+package cn.bugstack.chatgpt.data.infrastructure.dao.po;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

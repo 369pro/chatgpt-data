@@ -1,0 +1,67 @@
+name: Maven Build and Docker Image CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 8
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'adopt'
+        java-version: '8'
+
+    - name: Dependies Cache
+      uses: actions/cache@v2
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+
+    - name: Build with Maven
+      run: |
+          mvn clean package -Dmaven.test.skip=true
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v1 
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Login to DockerAlibaba
+      run: |
+        docker login --username=${{ secrets.ALIYUN_REGISTRY_USER }} --password=${{ secrets.ALIYUN_REGISTRY_PASSWORD }} registry.cn-hangzhou.aliyuncs.com
+
+    - name: Build and push
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        file: ./chatgpt-data-app/ActionDockerfile
+        # 所需要的体系结构，可以在 Available platforms 步骤中获取所有的可用架构 https://docs.docker.com/build/building/multi-platform/
+        platforms: linux/amd64
+        # 镜像推送时间
+        push: ${{ github.event_name != 'pull_request' }}
+        # 给清单打上多个标签
+        tags: |
+            fuzhengwei/chatgpt-data-app:3.0
+            fuzhengwei/chatgpt-data-app:latest    
+
+    - name: Tag image for Alibaba Cloud
+      run: |
+        docker tag fuzhengwei/chatgpt-data-app:3.0 registry.cn-hangzhou.aliyuncs.com/fuzhengwei/chatgpt-data-app:3.0
+        docker tag fuzhengwei/chatgpt-data-app:latest registry.cn-hangzhou.aliyuncs.com/fuzhengwei/chatgpt-data-app:latest
+
+    - name: Push to Alibaba Cloud Container Registry
+      run: |
+        docker push registry.cn-hangzhou.aliyuncs.com/fuzhengwei/chatgpt-data-app:3.0
+        docker push registry.cn-hangzhou.aliyuncs.com/fuzhengwei/chatgpt-data-app:latest
