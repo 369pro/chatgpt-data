@@ -45,8 +45,8 @@ jobs:
     - name: Build and push
       uses: docker/build-push-action@v2
       with:
-        context: .
-        file: ./chatgpt-data-app/ActionDockerfile
+        context: ./chatgpt-data-app/
+        file: ActionDockerfile
         # 所需要的体系结构，可以在 Available platforms 步骤中获取所有的可用架构 https://docs.docker.com/build/building/multi-platform/
         platforms: linux/amd64
         # 镜像推送时间
