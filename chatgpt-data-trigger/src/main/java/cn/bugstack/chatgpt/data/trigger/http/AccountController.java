@@ -3,8 +3,12 @@ package cn.bugstack.chatgpt.data.trigger.http;
 import cn.bugstack.chatgpt.data.domain.account.model.entity.AdjustQuotaEntity;
 import cn.bugstack.chatgpt.data.domain.account.model.valobj.AccountQuotaVO;
 import cn.bugstack.chatgpt.data.domain.account.service.IAccountAdjustQuotaService;
+import cn.bugstack.chatgpt.data.domain.account.service.IAccountQueryService;
+import cn.bugstack.chatgpt.data.domain.auth.service.IAuthService;
+import cn.bugstack.chatgpt.data.trigger.http.dto.AccountQuotaResponseDTO;
 import cn.bugstack.chatgpt.data.trigger.http.dto.AdjustQuotaRequestDTO;
 import cn.bugstack.chatgpt.data.trigger.http.dto.AdjustQuotaResponseDTO;
+import cn.bugstack.chatgpt.data.trigger.http.dto.SaleProductDTO;
 import cn.bugstack.chatgpt.data.types.common.Constants;
 import cn.bugstack.chatgpt.data.types.exception.ChatGPTException;
 import cn.bugstack.chatgpt.data.types.model.Response;
@@ -13,6 +17,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,10 +35,47 @@ public class AccountController {
     private Map<String, String> appTokenMap;
     @Resource
     private IAccountAdjustQuotaService accountAdjustQuotaService;
+    @Resource
+    private IAccountQueryService accountQueryService;
+    @Resource
+    private IAuthService authService;
+
+    @RequestMapping(value = "query_account_quota", method = RequestMethod.POST)
+    public Response<AccountQuotaResponseDTO> queryAccountQuota(@RequestHeader("Authorization") String token) {
+        try {
+            // 1. Token 校验
+            boolean success = authService.checkToken(token);
+            if (!success) {
+                return Response.<AccountQuotaResponseDTO>builder()
+                        .code(Constants.ResponseCode.TOKEN_ERROR.getCode())
+                        .info(Constants.ResponseCode.TOKEN_ERROR.getInfo())
+                        .build();
+            }
+
+            // 2. Token 解析
+            String openid = authService.openid(token);
+            assert null != openid;
+
+            // 3. 查询额度
+            AccountQuotaVO accountQuotaVO = accountQueryService.queryAccountQuota(openid);
+
+            return Response.<AccountQuotaResponseDTO>builder()
+                    .data(AccountQuotaResponseDTO.builder().totalQuota(accountQuotaVO.getTotalQuota()).surplusQuota(accountQuotaVO.getSurplusQuota()).build())
+                    .code(Constants.ResponseCode.SUCCESS.getCode())
+                    .info(Constants.ResponseCode.SUCCESS.getInfo())
+                    .build();
+        } catch (Exception e) {
+            log.error("查询账户额度失败", e);
+            return Response.<AccountQuotaResponseDTO>builder()
+                    .code(Constants.ResponseCode.UN_ERROR.getCode())
+                    .info(Constants.ResponseCode.UN_ERROR.getInfo())
+                    .build();
+        }
+    }
 
     /**
      * 在 apipost/apifox 点击导入接口「curl」方式导入
-     *
+     * <p>
      * curl -X POST \
      * http://localhost:8091/api/v1/account/adjust_quota \
      * -H 'Content-Type: application/json;charset=utf-8' \
