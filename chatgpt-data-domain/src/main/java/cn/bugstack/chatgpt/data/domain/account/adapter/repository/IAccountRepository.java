@@ -12,4 +12,6 @@ public interface IAccountRepository {
 
     AccountQuotaVO adjustQuota(AdjustQuotaEntity adjustQuotaEntity);
 
+    AccountQuotaVO queryAccountQuota(String openid);
+
 }
