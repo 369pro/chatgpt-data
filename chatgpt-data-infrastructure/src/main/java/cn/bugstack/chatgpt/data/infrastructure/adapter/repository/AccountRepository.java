@@ -41,7 +41,7 @@ public class AccountRepository implements IAccountRepository {
             userAccountPOReq.setTotalQuota(adjustQuotaEntity.getIncreaseQuota());
             userAccountPOReq.setSurplusQuota(adjustQuotaEntity.getIncreaseQuota());
             userAccountPOReq.setStatus(UserAccountStatusVO.AVAILABLE.getCode());
-            userAccountPOReq.setModelTypes("gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4,chatglm_lite,chatglm_std,chatglm_pro");
+            userAccountPOReq.setModelTypes("glm-4");
             userAccountDao.insert(userAccountPOReq);
         }
 
