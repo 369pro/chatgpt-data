@@ -13,6 +13,7 @@ import cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIOrderPO;
 import cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIProductPO;
 import cn.bugstack.chatgpt.data.infrastructure.dao.po.UserAccountPO;
 import cn.bugstack.chatgpt.data.types.enums.OpenAIProductEnableModel;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
@@ -32,6 +33,8 @@ import java.util.List;
 @Repository
 public class OrderRepository implements IOrderRepository {
 
+    @Value("${app.config.model-types:glm-4,gpt-4,gpt-3.5-turbo}")
+    private String modelTypes;
     @Resource
     private IOpenAIOrderDao openAIOrderDao;
     @Resource
@@ -151,7 +154,7 @@ public class OrderRepository implements IOrderRepository {
             if (1 != addAccountQuotaCount) throw new RuntimeException("addAccountQuotaCount update count is not equal 1");
         } else {
             userAccountPOReq.setStatus(UserAccountStatusVO.AVAILABLE.getCode());
-            userAccountPOReq.setModelTypes("glm-4");
+            userAccountPOReq.setModelTypes(modelTypes);
             userAccountDao.insert(userAccountPOReq);
         }
     }

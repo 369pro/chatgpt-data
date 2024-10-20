@@ -6,6 +6,7 @@ import cn.bugstack.chatgpt.data.domain.account.model.valobj.AccountQuotaVO;
 import cn.bugstack.chatgpt.data.domain.openai.model.valobj.UserAccountStatusVO;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IUserAccountDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.po.UserAccountPO;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import javax.annotation.Resource;
@@ -17,6 +18,9 @@ import javax.annotation.Resource;
  */
 @Repository
 public class AccountRepository implements IAccountRepository {
+
+    @Value("${app.config.model-types:glm-4,gpt-4,gpt-3.5-turbo}")
+    private String modelTypes;
 
     @Resource
     private IUserAccountDao userAccountDao;
@@ -41,7 +45,7 @@ public class AccountRepository implements IAccountRepository {
             userAccountPOReq.setTotalQuota(adjustQuotaEntity.getIncreaseQuota());
             userAccountPOReq.setSurplusQuota(adjustQuotaEntity.getIncreaseQuota());
             userAccountPOReq.setStatus(UserAccountStatusVO.AVAILABLE.getCode());
-            userAccountPOReq.setModelTypes("glm-4");
+            userAccountPOReq.setModelTypes(modelTypes);
             userAccountDao.insert(userAccountPOReq);
         }
 
