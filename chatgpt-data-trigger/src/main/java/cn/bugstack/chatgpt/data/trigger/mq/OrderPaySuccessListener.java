@@ -1,5 +1,6 @@
 package cn.bugstack.chatgpt.data.trigger.mq;
 
+import cn.bugstack.chatgpt.data.domain.order.model.aggregates.CreateOrderAggregate;
 import cn.bugstack.chatgpt.data.domain.order.service.IOrderService;
 import com.google.common.eventbus.Subscribe;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +26,11 @@ public class OrderPaySuccessListener {
     public void handleEvent(String orderId) {
         try {
             log.info("支付完成，发货并记录，开始。订单：{}", orderId);
+            CreateOrderAggregate createOrderAggregate = orderService.queryOrder(orderId);
+            // 发货
             orderService.deliverGoods(orderId);
+            // 返利 - 营销活动
+            orderService.rebateGoods(createOrderAggregate.getOpenid(), orderId);
         } catch (Exception e) {
             log.error("支付完成，发货并记录，失败。订单：{}", orderId, e);
         }

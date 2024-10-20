@@ -1,5 +1,6 @@
 package cn.bugstack.chatgpt.data.domain.order.service;
 
+import cn.bugstack.chatgpt.data.domain.order.adapter.port.IOrderPort;
 import cn.bugstack.chatgpt.data.domain.order.model.aggregates.CreateOrderAggregate;
 import cn.bugstack.chatgpt.data.domain.order.model.entity.OrderEntity;
 import cn.bugstack.chatgpt.data.domain.order.model.entity.PayOrderEntity;
@@ -37,6 +38,8 @@ public class OrderService extends AbstractOrderService {
     private String notifyUrl;
     @Autowired(required = false)
     private NativePayService payService;
+    @Resource
+    private IOrderPort port;
 
     @Override
     protected OrderEntity doSaveOrder(String openid, ProductEntity productEntity) {
@@ -130,6 +133,11 @@ public class OrderService extends AbstractOrderService {
     @Override
     public List<ProductEntity> queryProductList() {
         return orderRepository.queryProductList();
+    }
+
+    @Override
+    public void rebateGoods(String openid, String orderId) {
+        port.rebate(openid, orderId);
     }
 
 }

@@ -70,4 +70,6 @@ public interface IOrderService {
      */
     List<ProductEntity> queryProductList();
 
+    void rebateGoods(String openid, String orderId);
+
 }

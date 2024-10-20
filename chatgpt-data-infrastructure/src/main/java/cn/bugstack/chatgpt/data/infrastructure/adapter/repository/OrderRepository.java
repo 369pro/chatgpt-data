@@ -5,7 +5,7 @@ import cn.bugstack.chatgpt.data.domain.order.model.aggregates.CreateOrderAggrega
 import cn.bugstack.chatgpt.data.domain.order.model.entity.*;
 import cn.bugstack.chatgpt.data.domain.order.model.valobj.OrderStatusVO;
 import cn.bugstack.chatgpt.data.domain.order.model.valobj.PayStatusVO;
-import cn.bugstack.chatgpt.data.domain.order.repository.IOrderRepository;
+import cn.bugstack.chatgpt.data.domain.order.adapter.repository.IOrderRepository;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IOpenAIOrderDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IOpenAIProductDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IUserAccountDao;
