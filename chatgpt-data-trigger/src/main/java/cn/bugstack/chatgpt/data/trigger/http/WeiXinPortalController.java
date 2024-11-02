@@ -35,6 +35,7 @@ public class WeiXinPortalController {
     /**
      * 处理微信服务器发来的get请求，进行签名的验证【apix.natapp1.cc 是我在 <a href="https://natapp.cn/">https://natapp.cn</a> 购买的渠道，你需要自己购买一个使用】
      * <a href="http://apix.natapp1.cc/api/v1/wx/portal/wxad979c0307864a66">http://apix.natapp1.cc/api/v1/wx/portal/wxad979c0307864a66</a>
+     * <a href="http://117.72.90.238/api/v1/wx/portal/wxad979c0307864a66">http://117.72.90.238/api/v1/wx/portal/wxad979c0307864a66</a>
      * <p>
      * appid     微信端AppID
      * signature 微信端发来的签名
