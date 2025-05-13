@@ -68,7 +68,7 @@ public class TextGenerativeModelServiceImpl implements IGenerativeModelService {
                 List<ChatChoice> choices = chatCompletionResponse.getChoices();
                 for (ChatChoice chatChoice : choices) {
                     Message delta = chatChoice.getDelta();
-                    if (Constants.Role.ASSISTANT.getCode().equals(delta.getRole())) continue;
+                    if (Constants.Role.ASSISTANT.getCode().equals(delta.getRole()) && StringUtils.isBlank(delta.getContent())) continue;
 
                     // 应答完成
                     String finishReason = chatChoice.getFinishReason();
