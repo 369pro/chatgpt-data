@@ -43,4 +43,18 @@
         WHERE openid = #{openid}
     </update>
 
+    <insert id="addOrCreateAccountQuota"
+            parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.UserAccountPO">
+        INSERT INTO user_account(
+            openid, total_quota, surplus_quota, model_types, status,
+            create_time, update_time
+        ) VALUES(
+            #{openid}, #{totalQuota}, #{surplusQuota}, #{modelTypes}, #{status}, now(), now()
+        )
+        ON DUPLICATE KEY UPDATE
+            total_quota = total_quota + VALUES(total_quota),
+            surplus_quota = surplus_quota + VALUES(surplus_quota),
+            update_time = now()
+    </insert>
+
 </mapper>

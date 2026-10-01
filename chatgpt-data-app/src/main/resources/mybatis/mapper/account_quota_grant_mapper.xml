@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.bugstack.chatgpt.data.infrastructure.dao.IAccountQuotaGrantDao">
+
+    <resultMap id="accountQuotaGrantMap"
+               type="cn.bugstack.chatgpt.data.infrastructure.dao.po.AccountQuotaGrantPO">
+        <id column="id" property="id"/>
+        <result column="openid" property="openid"/>
+        <result column="request_id" property="requestId"/>
+        <result column="increase_quota" property="increaseQuota"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <insert id="insertIgnore"
+            parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.AccountQuotaGrantPO">
+        INSERT IGNORE INTO account_quota_grant(
+            openid, request_id, increase_quota, create_time
+        ) VALUES(
+            #{openid}, #{requestId}, #{increaseQuota}, now()
+        )
+    </insert>
+
+    <select id="query" resultMap="accountQuotaGrantMap">
+        SELECT id, openid, request_id, increase_quota, create_time
+        FROM account_quota_grant
+        WHERE openid = #{openid} AND request_id = #{requestId}
+    </select>
+
+</mapper>

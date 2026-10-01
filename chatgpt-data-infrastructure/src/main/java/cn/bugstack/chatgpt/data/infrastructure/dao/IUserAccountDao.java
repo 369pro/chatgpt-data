@@ -19,4 +19,6 @@ public interface IUserAccountDao {
 
     int addAccountQuota(UserAccountPO userAccountPOReq);
 
+    int addOrCreateAccountQuota(UserAccountPO userAccountPOReq);
+
 }

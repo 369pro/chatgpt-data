@@ -103,6 +103,7 @@ public class AccountController {
             // 2. 账户调额
             AccountQuotaVO accountQuotaVO = accountAdjustQuotaService.adjustQuota(AdjustQuotaEntity.builder()
                     .openid(adjustQuotaRequestDTO.getOpenid())
+                    .requestId(adjustQuotaRequestDTO.getRequestId())
                     .increaseQuota(adjustQuotaRequestDTO.getIncreaseQuota())
                     .build());
 

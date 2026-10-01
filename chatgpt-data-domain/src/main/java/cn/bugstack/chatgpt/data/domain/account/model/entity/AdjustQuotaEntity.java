@@ -18,6 +18,8 @@ public class AdjustQuotaEntity {
 
     /** 用户ID；微信分配的唯一ID编码 */
     private String openid;
+    /** 调额请求幂等键 */
+    private String requestId;
     /** 调增额度 */
     private Integer increaseQuota;
 
