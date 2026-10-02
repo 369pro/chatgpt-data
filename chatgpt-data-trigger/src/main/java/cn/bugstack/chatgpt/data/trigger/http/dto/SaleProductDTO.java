@@ -42,5 +42,7 @@ public class SaleProductDTO {
      * 钱包充值金额；为空表示历史额度商品
      */
     private BigDecimal creditAmount;
+    private BigDecimal feeRate;
+    private BigDecimal feeAmount;
 
 }

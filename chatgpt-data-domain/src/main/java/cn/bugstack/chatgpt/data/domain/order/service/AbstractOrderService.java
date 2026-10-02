@@ -19,6 +19,7 @@ public abstract class AbstractOrderService implements IOrderService {
                 || (product.getCreditAmount() != null && product.getCreditAmount().signum() <= 0)) {
             throw new IllegalArgumentException("Product unavailable");
         }
+        product.applyRechargeFee();
         UnpaidOrderEntity unpaid = orderRepository.queryUnpaidOrder(cart);
         if (unpaid != null) {
             if (unpaid.getPayUrl() != null) {

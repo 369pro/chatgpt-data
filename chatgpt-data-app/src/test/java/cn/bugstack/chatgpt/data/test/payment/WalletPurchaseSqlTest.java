@@ -1,5 +1,11 @@
 package cn.bugstack.chatgpt.data.test.payment;
 
+import cn.bugstack.chatgpt.data.domain.order.model.aggregates.CreateOrderAggregate;
+import cn.bugstack.chatgpt.data.domain.order.model.entity.OrderEntity;
+import cn.bugstack.chatgpt.data.domain.order.model.entity.ProductEntity;
+import cn.bugstack.chatgpt.data.domain.order.model.entity.ShopCartEntity;
+import cn.bugstack.chatgpt.data.domain.order.model.valobj.OrderStatusVO;
+import cn.bugstack.chatgpt.data.domain.order.model.valobj.PayTypeVO;
 import cn.bugstack.chatgpt.data.infrastructure.adapter.repository.OrderRepository;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IAccountWalletDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IBalanceGrantDao;
@@ -32,10 +38,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Mockito.mock;
 
 /**
  * Opt-in MySQL coverage for wallet purchase delivery. This class deliberately
@@ -45,7 +52,11 @@ import static org.mockito.Mockito.mock;
 public class WalletPurchaseSqlTest {
 
     private static final String PAYMENT_APP_ID = "payment";
-    private static final BigDecimal WALLET_AMOUNT = new BigDecimal("9.90");
+    private static final BigDecimal GROSS_AMOUNT = new BigDecimal("29.90");
+    private static final BigDecimal FEE_RATE = new BigDecimal("0.20");
+    private static final BigDecimal FEE_AMOUNT = new BigDecimal("5.98");
+    private static final BigDecimal NET_AMOUNT = new BigDecimal("23.92");
+    private static final BigDecimal WALLET_AMOUNT = NET_AMOUNT;
     private static final BigDecimal MAX_WALLET_AMOUNT = new BigDecimal("999999999999.99999999");
     private static final AtomicInteger PRODUCT_SEQUENCE = new AtomicInteger(1800000000);
 
@@ -69,7 +80,8 @@ public class WalletPurchaseSqlTest {
         String openid = uniqueOpenid();
         String orderId = uniqueOrderId();
         try {
-            fixture.insertPaidOrder(openid, orderId, 19001, 0, WALLET_AMOUNT, WALLET_AMOUNT);
+            fixture.insertPaidOrder(openid, orderId, 19001, 0, GROSS_AMOUNT, NET_AMOUNT,
+                    FEE_RATE, FEE_AMOUNT);
 
             fixture.deliverConcurrently(orderId);
             assertWalletGrant(openid, orderId, WALLET_AMOUNT);
@@ -129,7 +141,8 @@ public class WalletPurchaseSqlTest {
         String orderId = uniqueOrderId();
         try {
             fixture.insertOverflowWallet(openid);
-            fixture.insertPaidOrder(openid, orderId, 19003, 0, WALLET_AMOUNT, WALLET_AMOUNT);
+            fixture.insertPaidOrder(openid, orderId, 19003, 0, GROSS_AMOUNT, NET_AMOUNT,
+                    FEE_RATE, FEE_AMOUNT);
 
             RuntimeException failure = fixture.deliverWithStrictDecimalFailure(orderId);
             assertNotNull("wallet update should fail in strict decimal mode", failure);
@@ -155,17 +168,124 @@ public class WalletPurchaseSqlTest {
         String orderId = uniqueOrderId();
         int productId = PRODUCT_SEQUENCE.getAndIncrement();
         try {
-            fixture.insertProduct(productId, WALLET_AMOUNT, WALLET_AMOUNT);
-            fixture.insertPaidOrder(openid, orderId, productId, 0, WALLET_AMOUNT, WALLET_AMOUNT);
-            fixture.updateProduct(productId, new BigDecimal("99.90"), new BigDecimal("99.90"));
+            fixture.insertProduct(productId, GROSS_AMOUNT, NET_AMOUNT);
+            fixture.insertPaidOrder(openid, orderId, productId, 0, GROSS_AMOUNT, NET_AMOUNT,
+                    FEE_RATE, FEE_AMOUNT);
+            fixture.updateProduct(productId, new BigDecimal("99.90"), new BigDecimal("89.91"));
 
             fixture.deliver(orderId);
 
             assertWalletGrant(openid, orderId, WALLET_AMOUNT);
             assertAmount(WALLET_AMOUNT, fixture.queryDecimal(
-                    "SELECT product_credit_amount FROM openai_order WHERE order_id = ?", orderId));
+                "SELECT product_credit_amount FROM openai_order WHERE order_id = ?", orderId));
+            assertAmount(FEE_RATE, fixture.queryDecimal(
+                    "SELECT product_fee_rate FROM openai_order WHERE order_id = ?", orderId));
+            assertAmount(FEE_AMOUNT, fixture.queryDecimal(
+                    "SELECT product_fee_amount FROM openai_order WHERE order_id = ?", orderId));
             assertEquals(Integer.valueOf(2), fixture.queryInt(
                     "SELECT order_status FROM openai_order WHERE order_id = ?", orderId));
+        } finally {
+            fixture.deleteFixture(openid, orderId, productId);
+        }
+    }
+
+    @Test
+    public void repositorySaveOrderValidatesGrossPaymentAndDeliversNetOnce() throws Exception {
+        String openid = uniqueOpenid();
+        String orderId = uniqueOrderId();
+        int productId = PRODUCT_SEQUENCE.getAndIncrement();
+        try {
+            ProductEntity product = ProductEntity.builder()
+                    .productId(productId)
+                    .productName("wallet-sql-save")
+                    .productDesc("Wallet SQL fixture")
+                    .quota(0)
+                    .price(GROSS_AMOUNT)
+                    .creditAmount(GROSS_AMOUNT)
+                    .build();
+            product.applyRechargeFee();
+            OrderEntity order = OrderEntity.builder()
+                    .orderId(orderId)
+                    .orderTime(new Date())
+                    .orderStatus(OrderStatusVO.CREATE)
+                    .totalAmount(GROSS_AMOUNT)
+                    .payTypeVO(PayTypeVO.ALIPAY_SANDBOX)
+                    .build();
+
+            fixture.saveOrder(CreateOrderAggregate.builder()
+                    .openid(openid)
+                    .product(product)
+                    .order(order)
+                    .build());
+
+            assertAmount(GROSS_AMOUNT, fixture.queryDecimal(
+                    "SELECT total_amount FROM openai_order WHERE order_id = ?", orderId));
+            assertAmount(NET_AMOUNT, fixture.queryDecimal(
+                    "SELECT product_credit_amount FROM openai_order WHERE order_id = ?", orderId));
+            assertAmount(FEE_RATE, fixture.queryDecimal(
+                    "SELECT product_fee_rate FROM openai_order WHERE order_id = ?", orderId));
+            assertAmount(FEE_AMOUNT, fixture.queryDecimal(
+                    "SELECT product_fee_amount FROM openai_order WHERE order_id = ?", orderId));
+            CreateOrderAggregate saved = fixture.repository.queryOrder(orderId);
+            assertAmount(FEE_RATE, saved.getProduct().getFeeRate());
+            assertAmount(FEE_AMOUNT, saved.getProduct().getFeeAmount());
+
+            assertFalse(fixture.markPaid(orderId, "underpaid-" + orderId, NET_AMOUNT));
+            assertEquals(Integer.valueOf(0), fixture.queryInt(
+                    "SELECT order_status FROM openai_order WHERE order_id = ?", orderId));
+            assertTrue(fixture.markPaid(orderId, "paid-" + orderId, GROSS_AMOUNT));
+
+            fixture.deliverConcurrently(orderId);
+            fixture.deliver(orderId);
+            assertWalletGrant(openid, orderId, NET_AMOUNT);
+            assertAmount(NET_AMOUNT, fixture.queryDecimal(
+                    "SELECT available_amount FROM account_wallet WHERE openid = ?", openid));
+            assertEquals(Integer.valueOf(1), fixture.queryInt(
+                    "SELECT COUNT(*) FROM balance_grant WHERE app_id = ? AND request_id = ?",
+                    PAYMENT_APP_ID, orderId));
+            assertEquals(Integer.valueOf(2), fixture.queryInt(
+                    "SELECT order_status FROM openai_order WHERE order_id = ?", orderId));
+        } finally {
+            fixture.deleteFixture(openid, orderId, productId);
+        }
+    }
+
+    @Test
+    public void legacyWalletOrderWithNullFeeSnapshotKeepsOriginalCredit() {
+        String openid = uniqueOpenid();
+        String orderId = uniqueOrderId();
+        try {
+            fixture.insertPaidOrder(openid, orderId, 19004, 0, GROSS_AMOUNT, GROSS_AMOUNT,
+                    null, null);
+
+            fixture.deliver(orderId);
+
+            assertWalletGrant(openid, orderId, GROSS_AMOUNT);
+            assertEquals(Integer.valueOf(1), fixture.queryInt(
+                    "SELECT COUNT(*) FROM openai_order "
+                            + "WHERE order_id = ? AND product_fee_rate IS NULL AND product_fee_amount IS NULL",
+                    orderId));
+        } finally {
+            fixture.deleteFixture(openid, orderId, null);
+        }
+    }
+
+    @Test
+    public void legacyUnpaidOrderWithNullFeeSnapshotIsNotReusedAfterRequote() {
+        String openid = uniqueOpenid();
+        String orderId = uniqueOrderId();
+        int productId = PRODUCT_SEQUENCE.getAndIncrement();
+        try {
+            fixture.insertProduct(productId, GROSS_AMOUNT, NET_AMOUNT);
+            fixture.insertUnpaidOrder(openid, orderId, productId, 0, GROSS_AMOUNT, GROSS_AMOUNT,
+                    null, null);
+
+            ShopCartEntity cart = ShopCartEntity.builder()
+                    .openid(openid)
+                    .productId(productId)
+                    .payType(PayTypeVO.ALIPAY_SANDBOX)
+                    .build();
+            assertNull(fixture.repository.queryUnpaidOrder(cart));
         } finally {
             fixture.deleteFixture(openid, orderId, productId);
         }
@@ -259,6 +379,7 @@ public class WalletPurchaseSqlTest {
             factoryBean.setDataSource(dataSource);
             factoryBean.setMapperLocations(new Resource[]{
                     resolver.getResource("classpath:/mybatis/mapper/openai_order_mapper.xml"),
+                    resolver.getResource("classpath:/mybatis/mapper/openai_product_mapper.xml"),
                     resolver.getResource("classpath:/mybatis/mapper/user_account_mapper.xml"),
                     resolver.getResource("classpath:/mybatis/mapper/account_wallet_mapper.xml"),
                     resolver.getResource("classpath:/mybatis/mapper/account_balance_mapper.xml")
@@ -267,13 +388,14 @@ public class WalletPurchaseSqlTest {
 
             SqlSessionTemplate sqlSession = new SqlSessionTemplate(factoryBean.getObject());
             IOpenAIOrderDao orderDao = sqlSession.getMapper(IOpenAIOrderDao.class);
+            IOpenAIProductDao productDao = sqlSession.getMapper(IOpenAIProductDao.class);
             IUserAccountDao userAccountDao = sqlSession.getMapper(IUserAccountDao.class);
             IAccountWalletDao accountWalletDao = sqlSession.getMapper(IAccountWalletDao.class);
             IBalanceGrantDao balanceGrantDao = sqlSession.getMapper(IBalanceGrantDao.class);
 
             OrderRepository repository = new OrderRepository();
             setField(repository, "openAIOrderDao", orderDao);
-            setField(repository, "openAIProductDao", mock(IOpenAIProductDao.class));
+            setField(repository, "openAIProductDao", productDao);
             setField(repository, "userAccountDao", userAccountDao);
             setField(repository, "accountWalletDao", accountWalletDao);
             setField(repository, "balanceGrantDao", balanceGrantDao);
@@ -294,18 +416,60 @@ public class WalletPurchaseSqlTest {
                                      int productQuota,
                                      BigDecimal price,
                                      BigDecimal creditAmount) {
+            insertPaidOrder(openid, orderId, productId, productQuota, price, creditAmount, null, null);
+        }
+
+        private void insertPaidOrder(String openid,
+                                     String orderId,
+                                     int productId,
+                                     int productQuota,
+                                     BigDecimal price,
+                                     BigDecimal creditAmount,
+                                     BigDecimal productFeeRate,
+                                     BigDecimal productFeeAmount) {
             OpenAIOrderPO order = OpenAIOrderPO.builder()
                     .openid(openid)
                     .productId(productId)
                     .productName("wallet-it")
                     .productQuota(productQuota)
                     .productCreditAmount(creditAmount)
+                    .productFeeRate(productFeeRate)
+                    .productFeeAmount(productFeeAmount)
                     .orderId(orderId)
                     .orderTime(new Date())
                     .orderStatus(1)
                     .totalAmount(price)
                     .payType(0)
                     .payStatus(1)
+                    .build();
+            transactionTemplate.execute(status -> {
+                orderDao.insert(order);
+                return null;
+            });
+        }
+
+        private void insertUnpaidOrder(String openid,
+                                       String orderId,
+                                       int productId,
+                                       int productQuota,
+                                       BigDecimal price,
+                                       BigDecimal creditAmount,
+                                       BigDecimal productFeeRate,
+                                       BigDecimal productFeeAmount) {
+            OpenAIOrderPO order = OpenAIOrderPO.builder()
+                    .openid(openid)
+                    .productId(productId)
+                    .productName("wallet-it")
+                    .productQuota(productQuota)
+                    .productCreditAmount(creditAmount)
+                    .productFeeRate(productFeeRate)
+                    .productFeeAmount(productFeeAmount)
+                    .orderId(orderId)
+                    .orderTime(new Date())
+                    .orderStatus(0)
+                    .totalAmount(price)
+                    .payType(PayTypeVO.ALIPAY_SANDBOX.getCode())
+                    .payStatus(0)
                     .build();
             transactionTemplate.execute(status -> {
                 orderDao.insert(order);
@@ -354,6 +518,19 @@ public class WalletPurchaseSqlTest {
                 repository.deliverGoods(orderId);
                 return null;
             });
+        }
+
+        private void saveOrder(CreateOrderAggregate aggregate) {
+            transactionTemplate.execute(status -> {
+                repository.saveOrder(aggregate);
+                return null;
+            });
+        }
+
+        private boolean markPaid(String orderId, String transactionId, BigDecimal amount) {
+            Boolean changed = transactionTemplate.execute(status ->
+                    repository.changeOrderPaySuccess(orderId, transactionId, amount, new Date()));
+            return Boolean.TRUE.equals(changed);
         }
 
         private RuntimeException deliverWithStrictDecimalFailure(String orderId) {

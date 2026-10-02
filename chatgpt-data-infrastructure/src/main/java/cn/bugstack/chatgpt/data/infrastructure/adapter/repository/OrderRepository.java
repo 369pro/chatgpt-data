@@ -61,9 +61,11 @@ public class OrderRepository implements IOrderRepository {
         openAIOrderPOReq.setProductId(shopCartEntity.getProductId());
         openAIOrderPOReq.setPayType(shopCartEntity.getPayType().getCode());
         openAIOrderPOReq.setOrderTime(new Date(System.currentTimeMillis() - 30 * 60_000L));
-        OpenAIProductPO currentProduct = openAIProductDao.queryProductByProductId(shopCartEntity.getProductId());
+        ProductEntity currentProduct = queryProduct(shopCartEntity.getProductId());
         if (currentProduct == null) return null;
         openAIOrderPOReq.setProductCreditAmount(currentProduct.getCreditAmount());
+        openAIOrderPOReq.setProductFeeRate(currentProduct.getFeeRate());
+        openAIOrderPOReq.setProductFeeAmount(currentProduct.getFeeAmount());
         openAIOrderPOReq.setTotalAmount(currentProduct.getPrice());
         OpenAIOrderPO openAIOrderPORes = openAIOrderDao.queryUnpaidOrder(openAIOrderPOReq);
         if (null == openAIOrderPORes) return null;
@@ -89,6 +91,7 @@ public class OrderRepository implements IOrderRepository {
         productEntity.setPrice(openAIProductPO.getPrice());
         productEntity.setCreditAmount(openAIProductPO.getCreditAmount());
         productEntity.setEnable(OpenAIProductEnableModel.get(openAIProductPO.getIsEnabled()));
+        productEntity.applyRechargeFee();
         return productEntity;
     }
 
@@ -103,6 +106,8 @@ public class OrderRepository implements IOrderRepository {
         openAIOrderPO.setProductName(product.getProductName());
         openAIOrderPO.setProductQuota(product.getQuota());
         openAIOrderPO.setProductCreditAmount(product.getCreditAmount());
+        openAIOrderPO.setProductFeeRate(product.getFeeRate());
+        openAIOrderPO.setProductFeeAmount(product.getFeeAmount());
         openAIOrderPO.setOrderId(order.getOrderId());
         openAIOrderPO.setOrderTime(order.getOrderTime());
         openAIOrderPO.setOrderStatus(order.getOrderStatus().getCode());
@@ -144,6 +149,8 @@ public class OrderRepository implements IOrderRepository {
         product.setProductName(openAIOrderPO.getProductName());
         product.setQuota(openAIOrderPO.getProductQuota());
         product.setCreditAmount(openAIOrderPO.getProductCreditAmount());
+        product.setFeeRate(openAIOrderPO.getProductFeeRate());
+        product.setFeeAmount(openAIOrderPO.getProductFeeAmount());
 
         OrderEntity order = new OrderEntity();
         order.setOrderId(openAIOrderPO.getOrderId());
@@ -278,6 +285,7 @@ public class OrderRepository implements IOrderRepository {
             productEntity.setQuota(openAIProductPO.getQuota());
             productEntity.setPrice(openAIProductPO.getPrice());
             productEntity.setCreditAmount(openAIProductPO.getCreditAmount());
+            productEntity.applyRechargeFee();
             productEntityList.add(productEntity);
         }
         return productEntityList;

@@ -27,7 +27,7 @@ public class SaleController {
         List<SaleProductDTO> products = orderService.queryProductList().stream().map(p ->
                 SaleProductDTO.builder().productId(p.getProductId()).productName(p.getProductName())
                         .productDesc(p.getProductDesc()).price(p.getPrice()).quota(p.getQuota())
-                        .creditAmount(p.getCreditAmount()).build()
+                        .creditAmount(p.getCreditAmount()).feeRate(p.getFeeRate()).feeAmount(p.getFeeAmount()).build()
         ).collect(Collectors.toList());
         return success(products);
     }
@@ -96,6 +96,8 @@ public class SaleController {
         data.put("amount", order.getTotalAmount());
         data.put("quota", aggregate.getProduct().getQuota());
         data.put("creditAmount", aggregate.getProduct().getCreditAmount());
+        data.put("feeRate", aggregate.getProduct().getFeeRate());
+        data.put("feeAmount", aggregate.getProduct().getFeeAmount());
         data.put("productName", aggregate.getProduct().getProductName());
         data.put("expiresAt", order.getOrderTime().getTime() + 30 * 60_000L);
         return data;

@@ -39,7 +39,10 @@ public class WalletPurchaseOrderRepositoryTest {
 
     private static final String ORDER_ID = "PAYMENT0001";
     private static final String OPEN_ID = "user-1";
-    private static final BigDecimal CREDIT_AMOUNT = new BigDecimal("9.90");
+    private static final BigDecimal GROSS_AMOUNT = new BigDecimal("9.90");
+    private static final BigDecimal FEE_RATE = new BigDecimal("0.20");
+    private static final BigDecimal FEE_AMOUNT = new BigDecimal("1.98");
+    private static final BigDecimal CREDIT_AMOUNT = new BigDecimal("7.92");
 
     private IOpenAIOrderDao orderDao;
     private IOpenAIProductDao productDao;
@@ -139,6 +142,26 @@ public class WalletPurchaseOrderRepositoryTest {
     }
 
     @Test
+    public void historicalNullFeeSnapshotKeepsOriginalWalletCredit() {
+        OpenAIOrderPO historical = walletOrder();
+        historical.setProductCreditAmount(GROSS_AMOUNT);
+        historical.setProductFeeRate(null);
+        historical.setProductFeeAmount(null);
+        when(orderDao.queryOrder(ORDER_ID)).thenReturn(historical);
+        when(orderDao.updateOrderStatusDeliverGoods(ORDER_ID)).thenReturn(1);
+        when(accountDao.queryUserAccount(OPEN_ID)).thenReturn(existingAccount());
+        when(grantDao.insertIgnore(any(BalanceGrantPO.class))).thenReturn(1);
+        when(walletDao.addOrCreateWallet(any(AccountWalletPO.class))).thenReturn(1);
+
+        repository.deliverGoods(ORDER_ID);
+
+        ArgumentCaptor<BalanceGrantPO> grantCaptor = ArgumentCaptor.forClass(BalanceGrantPO.class);
+        verify(grantDao).insertIgnore(grantCaptor.capture());
+        assertEquals(0, GROSS_AMOUNT.compareTo(grantCaptor.getValue().getAmount()));
+        verify(walletDao).addOrCreateWallet(any(AccountWalletPO.class));
+    }
+
+    @Test
     public void deliveryUsesRequiredTransactionAndCasStopsRetries() throws Exception {
         Method method = OrderRepository.class.getMethod("deliverGoods", String.class);
         Transactional transactional = method.getAnnotation(Transactional.class);
@@ -155,36 +178,47 @@ public class WalletPurchaseOrderRepositoryTest {
     }
 
     @Test
-    public void productAndOrderQueriesCarryCreditAmount() {
+    public void productAndOrderQueriesCarryRechargeQuoteSnapshot() {
         when(productDao.queryProductByProductId(1001)).thenReturn(OpenAIProductPO.builder()
                 .productId(1001)
                 .productName("wallet")
                 .productDesc("CNY")
                 .quota(0)
-                .price(CREDIT_AMOUNT)
+                .price(GROSS_AMOUNT)
                 .creditAmount(CREDIT_AMOUNT)
                 .isEnabled(1)
                 .build());
-        assertEquals(0, CREDIT_AMOUNT.compareTo(repository.queryProduct(1001).getCreditAmount()));
+        ProductEntity product = repository.queryProduct(1001);
+        assertEquals(0, GROSS_AMOUNT.compareTo(product.getPrice()));
+        assertEquals(0, CREDIT_AMOUNT.compareTo(product.getCreditAmount()));
+        assertEquals(0, FEE_RATE.compareTo(product.getFeeRate()));
+        assertEquals(0, FEE_AMOUNT.compareTo(product.getFeeAmount()));
 
         when(orderDao.queryOrder(ORDER_ID)).thenReturn(walletOrder());
         CreateOrderAggregate order = repository.queryOrder(ORDER_ID);
         assertEquals(0, CREDIT_AMOUNT.compareTo(order.getProduct().getCreditAmount()));
+        assertEquals(0, FEE_RATE.compareTo(order.getProduct().getFeeRate()));
+        assertEquals(0, FEE_AMOUNT.compareTo(order.getProduct().getFeeAmount()));
 
         when(productDao.queryProductList()).thenReturn(java.util.Collections.singletonList(
-                OpenAIProductPO.builder().productId(1001).creditAmount(CREDIT_AMOUNT).build()));
-        assertEquals(0, CREDIT_AMOUNT.compareTo(repository.queryProductList().get(0).getCreditAmount()));
+                OpenAIProductPO.builder().productId(1001).price(GROSS_AMOUNT)
+                        .creditAmount(CREDIT_AMOUNT).isEnabled(1).build()));
+        ProductEntity listedProduct = repository.queryProductList().get(0);
+        assertEquals(0, CREDIT_AMOUNT.compareTo(listedProduct.getCreditAmount()));
+        assertEquals(0, FEE_RATE.compareTo(listedProduct.getFeeRate()));
+        assertEquals(0, FEE_AMOUNT.compareTo(listedProduct.getFeeAmount()));
     }
 
     @Test
-    public void newOrderSnapshotsWalletCreditAmount() {
+    public void newOrderSnapshotsWalletRechargeQuote() {
         ProductEntity product = ProductEntity.builder()
                 .productId(1001)
                 .productName("wallet")
                 .quota(0)
-                .price(CREDIT_AMOUNT)
-                .creditAmount(CREDIT_AMOUNT)
+                .price(GROSS_AMOUNT)
+                .creditAmount(GROSS_AMOUNT)
                 .build();
+        product.applyRechargeFee();
         CreateOrderAggregate aggregate = CreateOrderAggregate.builder()
                 .openid(OPEN_ID)
                 .product(product)
@@ -192,7 +226,7 @@ public class WalletPurchaseOrderRepositoryTest {
                         .orderId(ORDER_ID)
                         .orderTime(new java.util.Date())
                         .orderStatus(OrderStatusVO.CREATE)
-                        .totalAmount(CREDIT_AMOUNT)
+                        .totalAmount(GROSS_AMOUNT)
                         .payTypeVO(PayTypeVO.ALIPAY_SANDBOX)
                         .build())
                 .build();
@@ -202,14 +236,18 @@ public class WalletPurchaseOrderRepositoryTest {
         ArgumentCaptor<OpenAIOrderPO> orderCaptor = ArgumentCaptor.forClass(OpenAIOrderPO.class);
         verify(orderDao).insert(orderCaptor.capture());
         assertEquals(0, CREDIT_AMOUNT.compareTo(orderCaptor.getValue().getProductCreditAmount()));
+        assertEquals(0, GROSS_AMOUNT.compareTo(orderCaptor.getValue().getTotalAmount()));
+        assertEquals(0, FEE_RATE.compareTo(orderCaptor.getValue().getProductFeeRate()));
+        assertEquals(0, FEE_AMOUNT.compareTo(orderCaptor.getValue().getProductFeeAmount()));
     }
 
     @Test
     public void unpaidLookupUsesCurrentProductCreditAndPrice() {
         when(productDao.queryProductByProductId(1001)).thenReturn(OpenAIProductPO.builder()
                 .productId(1001)
-                .price(CREDIT_AMOUNT)
+                .price(GROSS_AMOUNT)
                 .creditAmount(CREDIT_AMOUNT)
+                .isEnabled(1)
                 .build());
         when(orderDao.queryUnpaidOrder(any(OpenAIOrderPO.class))).thenReturn(null);
 
@@ -222,7 +260,9 @@ public class WalletPurchaseOrderRepositoryTest {
         ArgumentCaptor<OpenAIOrderPO> requestCaptor = ArgumentCaptor.forClass(OpenAIOrderPO.class);
         verify(orderDao).queryUnpaidOrder(requestCaptor.capture());
         assertEquals(0, CREDIT_AMOUNT.compareTo(requestCaptor.getValue().getProductCreditAmount()));
-        assertEquals(0, CREDIT_AMOUNT.compareTo(requestCaptor.getValue().getTotalAmount()));
+        assertEquals(0, GROSS_AMOUNT.compareTo(requestCaptor.getValue().getTotalAmount()));
+        assertEquals(0, FEE_RATE.compareTo(requestCaptor.getValue().getProductFeeRate()));
+        assertEquals(0, FEE_AMOUNT.compareTo(requestCaptor.getValue().getProductFeeAmount()));
     }
 
     private OpenAIOrderPO walletOrder() {
@@ -231,9 +271,11 @@ public class WalletPurchaseOrderRepositoryTest {
                 .openid(OPEN_ID)
                 .productQuota(0)
                 .productCreditAmount(CREDIT_AMOUNT)
+                .productFeeRate(FEE_RATE)
+                .productFeeAmount(FEE_AMOUNT)
                 .orderTime(new java.util.Date())
                 .orderStatus(1)
-                .totalAmount(CREDIT_AMOUNT)
+                .totalAmount(GROSS_AMOUNT)
                 .payType(PayTypeVO.ALIPAY_SANDBOX.getCode())
                 .build();
     }

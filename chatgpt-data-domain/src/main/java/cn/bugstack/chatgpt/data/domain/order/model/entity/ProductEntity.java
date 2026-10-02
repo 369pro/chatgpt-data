@@ -1,6 +1,7 @@
 package cn.bugstack.chatgpt.data.domain.order.model.entity;
 
 import cn.bugstack.chatgpt.data.types.enums.OpenAIProductEnableModel;
+import cn.bugstack.chatgpt.data.domain.order.model.valobj.RechargeQuote;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -43,6 +44,17 @@ public class ProductEntity {
      * 钱包充值金额；为空表示历史额度商品
      */
     private BigDecimal creditAmount;
+    private BigDecimal feeRate;
+    private BigDecimal feeAmount;
+
+    /** Requote only current products; historical order snapshots must remain unchanged. */
+    public void applyRechargeFee() {
+        if (creditAmount == null) return;
+        RechargeQuote quote = RechargeQuote.from(price);
+        feeRate = quote.getFeeRate();
+        feeAmount = quote.getFeeAmount();
+        creditAmount = quote.getCreditAmount();
+    }
     /**
      * 商品状态；0无效、1有效
      */
