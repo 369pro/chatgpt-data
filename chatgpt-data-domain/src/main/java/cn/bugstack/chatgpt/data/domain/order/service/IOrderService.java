@@ -17,6 +17,11 @@ import java.util.List;
  */
 public interface IOrderService {
 
+    void reconcileOrder(String orderId);
+
+    void acceptNotification(cn.bugstack.chatgpt.data.domain.order.model.valobj.PayTypeVO type,
+                            java.util.Map<String, String> parameters);
+
     /**
      * 用户下单，通过购物车信息，返回下单后的支付单
      *

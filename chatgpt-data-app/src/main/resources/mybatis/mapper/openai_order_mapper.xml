@@ -39,6 +39,8 @@
         SELECT order_id, product_name, pay_url, pay_status, total_amount
         FROM openai_order
         WHERE openid = #{openid} AND product_id = #{productId} AND order_status = 0
+        AND pay_type = #{payType} AND pay_status = 0
+        AND order_time > #{orderTime}
         ORDER BY id desc
         LIMIT 1
     </select>
@@ -59,6 +61,7 @@
         transaction_id = #{transactionId},
         update_time = now()
         WHERE order_id = #{orderId} AND pay_time is null
+        AND total_amount = #{payAmount} AND order_status IN (0, 3)
     </update>
 
     <select id="queryOrder" parameterType="java.lang.String" resultMap="userAccountMap">
@@ -72,26 +75,28 @@
     <update id="updateOrderStatusDeliverGoods" parameterType="java.lang.String">
         UPDATE openai_order SET
         order_status = 2
-        WHERE order_id = #{orderId} AND order_status = 1
+        WHERE order_id = #{orderId} AND order_status = 1 AND pay_status = 1
     </update>
 
     <select id="queryReplenishmentOrder" resultType="java.lang.String">
         SELECT order_id as orderId FROM openai_order
-        WHERE order_status = 1 AND pay_status = 1 AND NOW() >= order_time + INTERVAL 3 MINUTE
+        WHERE order_status = 1 AND pay_status = 1 AND order_time &lt;= #{olderThan}
         ORDER BY id ASC
         LIMIT 10
     </select>
 
     <select id="queryNoPayNotifyOrder" resultType="java.lang.String">
         SELECT order_id as orderId FROM openai_order
-        WHERE order_status = 0 AND pay_status = 0 AND NOW() >= order_time + INTERVAL 1 MINUTE
+        WHERE order_status = 0 AND pay_status = 0 AND order_time &lt;= #{olderThan}
+        AND pay_type = 1
         ORDER BY id ASC
         LIMIT 10
     </select>
 
     <select id="queryTimeoutCloseOrderList" resultType="java.lang.String">
         SELECT order_id as orderId FROM openai_order
-        WHERE order_status = 0 AND pay_status = 0 AND NOW() >= order_time + INTERVAL 30 MINUTE
+        WHERE order_status = 0 AND pay_status = 0 AND order_time &lt;= #{olderThan}
+        AND pay_type = 1
         ORDER BY id ASC
         LIMIT 50
     </select>

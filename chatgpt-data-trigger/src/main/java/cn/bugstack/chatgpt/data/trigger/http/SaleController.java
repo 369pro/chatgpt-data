@@ -1,216 +1,113 @@
 package cn.bugstack.chatgpt.data.trigger.http;
 
 import cn.bugstack.chatgpt.data.domain.auth.service.IAuthService;
-import cn.bugstack.chatgpt.data.domain.order.model.entity.PayOrderEntity;
-import cn.bugstack.chatgpt.data.domain.order.model.entity.ProductEntity;
-import cn.bugstack.chatgpt.data.domain.order.model.entity.ShopCartEntity;
+import cn.bugstack.chatgpt.data.domain.order.model.entity.*;
+import cn.bugstack.chatgpt.data.domain.order.model.aggregates.CreateOrderAggregate;
+import cn.bugstack.chatgpt.data.domain.order.model.valobj.PayTypeVO;
 import cn.bugstack.chatgpt.data.domain.order.service.IOrderService;
 import cn.bugstack.chatgpt.data.trigger.http.dto.SaleProductDTO;
-import cn.bugstack.chatgpt.data.types.common.Constants;
 import cn.bugstack.chatgpt.data.types.model.Response;
-import com.alibaba.fastjson.JSON;
-import com.google.common.eventbus.EventBus;
-import com.wechat.pay.java.core.notification.NotificationParser;
-import com.wechat.pay.java.service.partnerpayments.nativepay.model.Transaction;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.web.bind.annotation.*;
-
 import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
-/**
- * @author Fuzhengwei bugstack.cn @小傅哥
- * @description 售卖服务
- * @create 2023-10-05 17:27
- */
 @Slf4j
-@RestController()
+@RestController
 @CrossOrigin("${app.config.cross-origin}")
 @RequestMapping("/api/${app.config.api-version}/sale/")
 public class SaleController {
+    @Resource private IOrderService orderService;
+    @Resource private IAuthService authService;
 
-    @Autowired(required = false)
-    private NotificationParser notificationParser;
-
-    @Resource
-    private IOrderService orderService;
-    @Resource
-    private IAuthService authService;
-    @Resource
-    private EventBus eventBus;
-
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
-
-    /**
-     * 商品列表查询
-     * 开始地址：http://localhost:8091/api/v1/sale/query_product_list
-     * 测试地址：http://apix.natapp1.cc/api/v1/sale/query_product_list
-     * <p>
-     * curl -X GET \
-     * -H "Authorization: REDACTED" \
-     * -H "Content-Type: application/x-www-form-urlencoded" \
-     * http://localhost:8091/api/v1/sale/query_product_list
-     */
-    @RequestMapping(value = "query_product_list", method = RequestMethod.GET)
+    @GetMapping("query_product_list")
     public Response<List<SaleProductDTO>> queryProductList(@RequestHeader("Authorization") String token) {
+        if (!authService.checkToken(token)) return loginRequired();
+        List<SaleProductDTO> products = orderService.queryProductList().stream().map(p ->
+                SaleProductDTO.builder().productId(p.getProductId()).productName(p.getProductName())
+                        .productDesc(p.getProductDesc()).price(p.getPrice()).quota(p.getQuota()).build()
+        ).collect(Collectors.toList());
+        return success(products);
+    }
+
+    @PostMapping("create_pay_order")
+    public Response<Map<String, Object>> createPayOrder(@RequestHeader("Authorization") String token,
+            @RequestParam Integer productId, @RequestParam(defaultValue = "ALIPAY_SANDBOX") String channel) {
+        if (!authService.checkToken(token)) return loginRequired();
         try {
-            // 1. Token 校验
-            boolean success = authService.checkToken(token);
-            if (!success) {
-                return Response.<List<SaleProductDTO>>builder()
-                        .code(Constants.ResponseCode.TOKEN_ERROR.getCode())
-                        .info(Constants.ResponseCode.TOKEN_ERROR.getInfo())
-                        .build();
-            }
-            // 2. 查询商品
-            List<ProductEntity> productEntityList = orderService.queryProductList();
-            log.info("商品查询 {}", JSON.toJSONString(productEntityList));
-
-            List<SaleProductDTO> mallProductDTOS = new ArrayList<>();
-            for (ProductEntity productEntity : productEntityList) {
-                SaleProductDTO mallProductDTO = SaleProductDTO.builder()
-                        .productId(productEntity.getProductId())
-                        .productName(productEntity.getProductName())
-                        .productDesc(productEntity.getProductDesc())
-                        .price(productEntity.getPrice())
-                        .quota(productEntity.getQuota())
-                        .build();
-                mallProductDTOS.add(mallProductDTO);
-            }
-
-            // 3. 返回结果
-            return Response.<List<SaleProductDTO>>builder()
-                    .code(Constants.ResponseCode.SUCCESS.getCode())
-                    .info(Constants.ResponseCode.SUCCESS.getInfo())
-                    .data(mallProductDTOS)
-                    .build();
+            PayTypeVO type = PayTypeVO.valueOf(channel);
+            PayOrderEntity payment = orderService.createOrder(ShopCartEntity.builder()
+                    .openid(authService.openid(token)).productId(productId).payType(type).build());
+            Map<String, Object> data = status(orderService.queryOrder(payment.getOrderId()));
+            data.put("payUrl", payment.getPayUrl());
+            return success(data);
+        } catch (IllegalArgumentException e) {
+            return failure("商品不可购买或支付渠道不支持");
+        } catch (IllegalStateException e) {
+            log.warn("Payment channel unavailable: {}", e.getMessage());
+            return failure("支付渠道暂不可用，请检查沙箱配置");
         } catch (Exception e) {
-            log.error("商品查询失败", e);
-            return Response.<List<SaleProductDTO>>builder()
-                    .code(Constants.ResponseCode.UN_ERROR.getCode())
-                    .info(Constants.ResponseCode.UN_ERROR.getInfo())
-                    .build();
+            log.error("Create payment failed", e);
+            return failure("下单失败，请稍后重试");
         }
     }
 
-    /**
-     * 用户商品下单
-     * 开始地址：http://localhost:8091/api/v1/sale/create_pay_order?productId=
-     * 测试地址：http://apix.natapp1.cc/api/v1/sale/create_pay_order
-     * <p>
-     * curl -X POST \
-     * -H "Authorization: REDACTED" \
-     * -H "Content-Type: application/x-www-form-urlencoded" \
-     * -d "productId=1001" \
-     * http://localhost:8091/api/v1/sale/create_pay_order
-     */
-    @RequestMapping(value = "create_pay_order", method = RequestMethod.POST)
-    public Response<String> createParOrder(@RequestHeader("Authorization") String token, @RequestParam Integer productId) {
+    @GetMapping("query_pay_order")
+    public Response<Map<String, Object>> queryPayOrder(@RequestHeader("Authorization") String token,
+                                                       @RequestParam String orderId) {
+        if (!authService.checkToken(token)) return loginRequired();
+        CreateOrderAggregate order = orderService.queryOrder(orderId);
+        if (order == null || !authService.openid(token).equals(order.getOpenid())) {
+            return failure("订单不存在");
+        }
         try {
-            // 1. Token 校验
-            boolean success = authService.checkToken(token);
-            if (!success) {
-                return Response.<String>builder()
-                        .code(Constants.ResponseCode.TOKEN_ERROR.getCode())
-                        .info(Constants.ResponseCode.TOKEN_ERROR.getInfo())
-                        .build();
-            }
-
-            // 2. Token 解析
-            String openid = authService.openid(token);
-            assert null != openid;
-            log.info("用户商品下单，根据商品ID创建支付单开始 openid:{} productId:{}", openid, productId);
-
-            ShopCartEntity shopCartEntity = ShopCartEntity.builder()
-                    .openid(openid)
-                    .productId(productId).build();
-
-            PayOrderEntity payOrder = orderService.createOrder(shopCartEntity);
-            log.info("用户商品下单，根据商品ID创建支付单完成 openid: {} productId: {} orderPay: {}", openid, productId, payOrder.toString());
-
-            return Response.<String>builder()
-                    .code(Constants.ResponseCode.SUCCESS.getCode())
-                    .info(Constants.ResponseCode.SUCCESS.getInfo())
-                    .data(payOrder.getPayUrl())
-                    .build();
+            orderService.reconcileOrder(orderId);
+            return success(status(orderService.queryOrder(orderId)));
         } catch (Exception e) {
-            log.error("用户商品下单，根据商品ID创建支付单失败", e);
-            return Response.<String>builder()
-                    .code(Constants.ResponseCode.UN_ERROR.getCode())
-                    .info(Constants.ResponseCode.UN_ERROR.getInfo())
-                    .build();
+            log.warn("Payment query temporarily unavailable for order {}", orderId);
+            return failure("支付结果确认中，请稍后查询，不要重复付款");
         }
     }
 
-    /**
-     * 支付回调
-     * 开发地址：http:/localhost:8091/api/v1/sale/pay_notify
-     * 测试地址：http://apix.natapp1.cc/api/v1/sale/pay_notify
-     * 线上地址：https://你的域名/api/v1/sale/pay_notify
-     */
-    @PostMapping("pay_notify")
-    public void payNotify(@RequestBody String requestBody, HttpServletRequest request, HttpServletResponse response) throws IOException {
+    @PostMapping(value = "alipay/notify", produces = "text/plain;charset=UTF-8")
+    public String alipayNotify(@RequestParam Map<String, String> parameters) {
         try {
-            // 随机串
-            String nonceStr = request.getHeader("Wechatpay-Nonce");
-            // 微信传递过来的签名
-            String signature = request.getHeader("Wechatpay-Signature");
-            // 证书序列号（微信平台）
-            String serialNo = request.getHeader("Wechatpay-Serial");
-            // 时间戳
-            String timestamp = request.getHeader("Wechatpay-Timestamp");
-
-            // 构造 RequestParam
-            com.wechat.pay.java.core.notification.RequestParam requestParam = new com.wechat.pay.java.core.notification.RequestParam.Builder()
-                    .serialNumber(serialNo)
-                    .nonce(nonceStr)
-                    .signature(signature)
-                    .timestamp(timestamp)
-                    .body(requestBody)
-                    .build();
-
-            // 以支付通知回调为例，验签、解密并转换成 Transaction
-            Transaction transaction = notificationParser.parse(requestParam, Transaction.class);
-
-            Transaction.TradeStateEnum tradeState = transaction.getTradeState();
-            if (Transaction.TradeStateEnum.SUCCESS.equals(tradeState)) {
-                // 支付单号
-                String orderId = transaction.getOutTradeNo();
-                String transactionId = transaction.getTransactionId();
-                Integer total = transaction.getAmount().getTotal();
-                String successTime = transaction.getSuccessTime();
-                Date payTime = null;
-                if (StringUtils.isBlank(successTime)){
-                    payTime = new Date();
-                } else {
-                    payTime = dateFormat.parse(successTime);
-                }
-                log.info("支付成功 orderId:{} total:{} successTime: {}", orderId, total, successTime);
-                // 更新订单
-                boolean isSuccess = orderService.changeOrderPaySuccess(orderId, transactionId, new BigDecimal(total).divide(new BigDecimal(100), 2, RoundingMode.HALF_UP), payTime);
-                if (isSuccess) {
-                    // 发布消息
-                    eventBus.post(orderId);
-                }
-                response.getWriter().write("<xml><return_code><![CDATA[SUCCESS]]></return_code></xml>");
-            } else {
-                response.getWriter().write("<xml><return_code><![CDATA[FAIL]]></return_code></xml>");
-            }
+            orderService.acceptNotification(PayTypeVO.ALIPAY_SANDBOX, parameters);
+            return "success";
         } catch (Exception e) {
-            log.error("支付失败", e);
-            response.getWriter().write("<xml><return_code><![CDATA[FAIL]]></return_code></xml>");
+            log.warn("Alipay notification rejected: {}", e.getClass().getSimpleName());
+            return "failure";
         }
     }
 
+    @PostMapping(value = "pay_notify", produces = "text/plain;charset=UTF-8")
+    public String wechatNotify() {
+        return "failure";
+    }
+
+    private Map<String, Object> status(CreateOrderAggregate aggregate) {
+        OrderEntity order = aggregate.getOrder();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("orderId", order.getOrderId());
+        data.put("status", order.getOrderStatus().name());
+        data.put("channel", order.getPayTypeVO().name());
+        data.put("amount", order.getTotalAmount());
+        data.put("quota", aggregate.getProduct().getQuota());
+        data.put("productName", aggregate.getProduct().getProductName());
+        data.put("expiresAt", order.getOrderTime().getTime() + 30 * 60_000L);
+        return data;
+    }
+
+    private <T> Response<T> success(T data) {
+        return Response.<T>builder().code("0000").info("成功").data(data).build();
+    }
+    private <T> Response<T> failure(String info) {
+        return Response.<T>builder().code("0001").info(info).build();
+    }
+    private <T> Response<T> loginRequired() {
+        return Response.<T>builder().code(
+                cn.bugstack.chatgpt.data.types.common.Constants.ResponseCode.TOKEN_ERROR.getCode())
+                .info("请重新登录").build();
+    }
 }

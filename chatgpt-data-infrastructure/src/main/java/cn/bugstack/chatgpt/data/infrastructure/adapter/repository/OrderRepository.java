@@ -47,6 +47,8 @@ public class OrderRepository implements IOrderRepository {
         OpenAIOrderPO openAIOrderPOReq = new OpenAIOrderPO();
         openAIOrderPOReq.setOpenid(shopCartEntity.getOpenid());
         openAIOrderPOReq.setProductId(shopCartEntity.getProductId());
+        openAIOrderPOReq.setPayType(shopCartEntity.getPayType().getCode());
+        openAIOrderPOReq.setOrderTime(new Date(System.currentTimeMillis() - 30 * 60_000L));
         OpenAIOrderPO openAIOrderPORes = openAIOrderDao.queryUnpaidOrder(openAIOrderPOReq);
         if (null == openAIOrderPORes) return null;
         return UnpaidOrderEntity.builder()
@@ -62,6 +64,7 @@ public class OrderRepository implements IOrderRepository {
     @Override
     public ProductEntity queryProduct(Integer productId) {
         OpenAIProductPO openAIProductPO = openAIProductDao.queryProductByProductId(productId);
+        if (openAIProductPO == null) return null;
         ProductEntity productEntity = new ProductEntity();
         productEntity.setProductId(openAIProductPO.getProductId());
         productEntity.setProductName(openAIProductPO.getProductName());
@@ -116,15 +119,19 @@ public class OrderRepository implements IOrderRepository {
     public CreateOrderAggregate queryOrder(String orderId) {
         OpenAIOrderPO openAIOrderPO = openAIOrderDao.queryOrder(orderId);
 
+        if (openAIOrderPO == null) return null;
+
         ProductEntity product = new ProductEntity();
         product.setProductId(openAIOrderPO.getProductId());
         product.setProductName(openAIOrderPO.getProductName());
+        product.setQuota(openAIOrderPO.getProductQuota());
 
         OrderEntity order = new OrderEntity();
         order.setOrderId(openAIOrderPO.getOrderId());
         order.setOrderTime(openAIOrderPO.getOrderTime());
         order.setOrderStatus(OrderStatusVO.get(openAIOrderPO.getOrderStatus()));
         order.setTotalAmount(openAIOrderPO.getTotalAmount());
+        order.setPayTypeVO(cn.bugstack.chatgpt.data.domain.order.model.valobj.PayTypeVO.get(openAIOrderPO.getPayType()));
 
         CreateOrderAggregate createOrderAggregate = new CreateOrderAggregate();
         createOrderAggregate.setOpenid(openAIOrderPO.getOpenid());
@@ -141,7 +148,7 @@ public class OrderRepository implements IOrderRepository {
 
         // 1. 变更发货状态
         int updateOrderStatusDeliverGoodsCount = openAIOrderDao.updateOrderStatusDeliverGoods(orderId);
-        if (1 != updateOrderStatusDeliverGoodsCount) throw new RuntimeException("updateOrderStatusDeliverGoodsCount update count is not equal 1");
+        if (updateOrderStatusDeliverGoodsCount == 0) return;
 
         // 2. 账户额度变更
         UserAccountPO userAccountPO = userAccountDao.queryUserAccount(openAIOrderPO.getOpenid());
@@ -161,17 +168,17 @@ public class OrderRepository implements IOrderRepository {
 
     @Override
     public List<String> queryReplenishmentOrder() {
-        return openAIOrderDao.queryReplenishmentOrder();
+        return openAIOrderDao.queryReplenishmentOrder(new Date(System.currentTimeMillis() - 3 * 60_000L));
     }
 
     @Override
     public List<String> queryNoPayNotifyOrder() {
-        return openAIOrderDao.queryNoPayNotifyOrder();
+        return openAIOrderDao.queryNoPayNotifyOrder(new Date(System.currentTimeMillis() - 60_000L));
     }
 
     @Override
     public List<String> queryTimeoutCloseOrderList() {
-        return openAIOrderDao.queryTimeoutCloseOrderList();
+        return openAIOrderDao.queryTimeoutCloseOrderList(new Date(System.currentTimeMillis() - 30 * 60_000L));
     }
 
     @Override

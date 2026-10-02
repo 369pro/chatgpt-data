@@ -2,7 +2,9 @@ package cn.bugstack.chatgpt.data.infrastructure.dao;
 
 import cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIOrderPO;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -25,11 +27,11 @@ public interface IOpenAIOrderDao {
 
     int updateOrderStatusDeliverGoods(String orderId);
 
-    List<String> queryReplenishmentOrder();
+    List<String> queryReplenishmentOrder(@Param("olderThan") Date olderThan);
 
-    List<String> queryNoPayNotifyOrder();
+    List<String> queryNoPayNotifyOrder(@Param("olderThan") Date olderThan);
 
-    List<String> queryTimeoutCloseOrderList();
+    List<String> queryTimeoutCloseOrderList(@Param("olderThan") Date olderThan);
 
     boolean changeOrderClose(String orderId);
 

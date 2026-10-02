@@ -26,6 +26,10 @@ public class ShopCartEntity {
      */
     private Integer productId;
 
+    @Builder.Default
+    private cn.bugstack.chatgpt.data.domain.order.model.valobj.PayTypeVO payType =
+            cn.bugstack.chatgpt.data.domain.order.model.valobj.PayTypeVO.ALIPAY_SANDBOX;
+
     @Override
     public String toString() {
         return "ShopCartEntity{" +

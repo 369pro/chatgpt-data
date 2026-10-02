@@ -13,6 +13,7 @@ import lombok.Getter;
 public enum PayTypeVO {
 
     WEIXIN_NATIVE(0, "微信Native支付"),
+    ALIPAY_SANDBOX(1, "支付宝沙箱支付"),
             ;
 
     private final Integer code;
@@ -20,10 +21,12 @@ public enum PayTypeVO {
 
     public static PayTypeVO get(Integer code){
         switch (code){
+            case 1:
+                return PayTypeVO.ALIPAY_SANDBOX;
             case 0:
                 return PayTypeVO.WEIXIN_NATIVE;
             default:
-                return PayTypeVO.WEIXIN_NATIVE;
+                throw new IllegalArgumentException("Unsupported payment channel");
         }
     }
 

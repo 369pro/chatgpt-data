@@ -1,6 +1,7 @@
 spring:
   config:
     name: chatgpt-data-app
+    import: "optional:file:.env[.properties],optional:file:${PAYMENT_CONFIG_FILE:.env.payment}[.properties]"
   profiles:
 #    active: dev
     active: prod

@@ -1,143 +1,93 @@
 package cn.bugstack.chatgpt.data.domain.order.service;
 
 import cn.bugstack.chatgpt.data.domain.order.adapter.port.IOrderPort;
+import cn.bugstack.chatgpt.data.domain.order.adapter.port.PaymentStrategy;
 import cn.bugstack.chatgpt.data.domain.order.model.aggregates.CreateOrderAggregate;
-import cn.bugstack.chatgpt.data.domain.order.model.entity.OrderEntity;
-import cn.bugstack.chatgpt.data.domain.order.model.entity.PayOrderEntity;
-import cn.bugstack.chatgpt.data.domain.order.model.entity.ProductEntity;
-import cn.bugstack.chatgpt.data.domain.order.model.valobj.OrderStatusVO;
-import cn.bugstack.chatgpt.data.domain.order.model.valobj.PayStatusVO;
-import cn.bugstack.chatgpt.data.domain.order.model.valobj.PayTypeVO;
-import com.wechat.pay.java.service.payments.nativepay.NativePayService;
-import com.wechat.pay.java.service.payments.nativepay.model.Amount;
-import com.wechat.pay.java.service.payments.nativepay.model.PrepayRequest;
-import com.wechat.pay.java.service.payments.nativepay.model.PrepayResponse;
+import cn.bugstack.chatgpt.data.domain.order.model.entity.*;
+import cn.bugstack.chatgpt.data.domain.order.model.valobj.*;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
-/**
- * @author Fuzhengwei bugstack.cn @小傅哥
- * @description 订单服务
- * @create 2023-10-05 13:10
- */
 @Service
 public class OrderService extends AbstractOrderService {
-
-    @Value("${wxpay.config.appid}")
-    private String appid;
-    @Value("${wxpay.config.mchid}")
-    private String mchid;
-    @Value("${wxpay.config.notify-url}")
-    private String notifyUrl;
-    @Autowired(required = false)
-    private NativePayService payService;
-    @Resource
-    private IOrderPort port;
+    @Resource private IOrderPort port;
 
     @Override
-    protected OrderEntity doSaveOrder(String openid, ProductEntity productEntity) {
-        OrderEntity orderEntity = new OrderEntity();
-        // 数据库有幂等拦截，如果有重复的订单ID会报错主键冲突。如果是公司里一般会有专门的雪花算法UUID服务
-        orderEntity.setOrderId(RandomStringUtils.randomNumeric(12));
-        orderEntity.setOrderTime(new Date());
-        orderEntity.setOrderStatus(OrderStatusVO.CREATE);
-        orderEntity.setTotalAmount(productEntity.getPrice());
-        orderEntity.setPayTypeVO(PayTypeVO.WEIXIN_NATIVE);
-        // 聚合信息
-        CreateOrderAggregate aggregate = CreateOrderAggregate.builder()
-                .openid(openid)
-                .product(productEntity)
-                .order(orderEntity)
-                .build();
-        // 保存订单；订单和支付，是2个操作。
-        // 一个是数据库操作，一个是HTTP操作。所以不能一个事务处理，只能先保存订单再操作创建支付单，如果失败则需要任务补偿
-        orderRepository.saveOrder(aggregate);
-        return orderEntity;
+    protected OrderEntity doSaveOrder(String openid, ProductEntity product, PayTypeVO type) {
+        OrderEntity order = OrderEntity.builder().orderId(RandomStringUtils.randomNumeric(12))
+                .orderTime(new Date()).orderStatus(OrderStatusVO.CREATE)
+                .totalAmount(product.getPrice()).payTypeVO(type).build();
+        orderRepository.saveOrder(CreateOrderAggregate.builder().openid(openid).product(product).order(order).build());
+        return order;
     }
 
     @Override
-    protected PayOrderEntity doPrepayOrder(String openid, String orderId, String productName, BigDecimal amountTotal) {
-        PrepayRequest request = new PrepayRequest();
-        Amount amount = new Amount();
-        amount.setTotal(amountTotal.multiply(new BigDecimal(100)).intValue());
-        request.setAmount(amount);
-        request.setAppid(appid);
-        request.setMchid(mchid);
-        request.setDescription(productName);
-        request.setNotifyUrl(notifyUrl);
-        request.setOutTradeNo(orderId);
+    protected PayOrderEntity doPrepayOrder(String openid, String id, String name, BigDecimal amount, PayTypeVO type) {
+        OrderEntity order = queryOrder(id).getOrder();
+        Date expiresAt = new Date(order.getOrderTime().getTime() + 30 * 60_000L);
+        String url = paymentStrategies.get(type).create(id, name, amount, expiresAt);
+        PayOrderEntity payment = PayOrderEntity.builder().openid(openid).orderId(id)
+                .payUrl(url).payStatus(PayStatusVO.WAIT).build();
+        orderRepository.updateOrderPayInfo(payment);
+        return payment;
+    }
 
-        // 创建微信支付单，如果你有多种支付方式，则可以根据支付类型的策略模式进行创建支付单
-        String codeUrl = "";
-        if (null != payService) {
-            PrepayResponse prepay = payService.prepay(request);
-            codeUrl = prepay.getCodeUrl();
-        } else {
-            codeUrl = "因你未配置支付渠道，所以暂时不能生成有效的支付URL。请配置支付渠道后，在application-dev.yml中配置支付渠道信息";
+    @Override
+    public boolean changeOrderPaySuccess(String id, String transactionId, BigDecimal amount, Date paidAt) {
+        CreateOrderAggregate aggregate = queryOrder(id);
+        if (aggregate == null || amount == null || aggregate.getOrder().getTotalAmount().compareTo(amount) != 0
+                || transactionId == null || transactionId.isBlank()) {
+            throw new IllegalArgumentException("Payment does not match order");
         }
-
-        PayOrderEntity payOrderEntity = PayOrderEntity.builder()
-                .openid(openid)
-                .orderId(orderId)
-                .payUrl(codeUrl)
-                .payStatus(PayStatusVO.WAIT)
-                .build();
-
-        // 更新订单支付信息
-        orderRepository.updateOrderPayInfo(payOrderEntity);
-        return payOrderEntity;
+        return orderRepository.changeOrderPaySuccess(id, transactionId, amount, paidAt == null ? new Date() : paidAt);
     }
 
     @Override
-    public boolean changeOrderPaySuccess(String orderId, String transactionId, BigDecimal totalAmount, Date payTime) {
-        return orderRepository.changeOrderPaySuccess(orderId, transactionId, totalAmount, payTime);
+    public void acceptNotification(PayTypeVO type, Map<String, String> parameters) {
+        PaymentResult result = paymentStrategies.get(type).verifyNotification(parameters);
+        CreateOrderAggregate aggregate = queryOrder(result.getOrderId());
+        if (aggregate == null || aggregate.getOrder().getPayTypeVO() != type ||
+                result.getAmount() == null || aggregate.getOrder().getTotalAmount().compareTo(result.getAmount()) != 0) {
+            throw new IllegalArgumentException("Payment does not match order");
+        }
+        // Signed notification is additionally checked against the merchant's trade query.
+        // This also validates the receiving merchant when seller-id is not configured.
+        if (result.isPaid() || result.isClosed()) reconcileOrder(result.getOrderId());
     }
 
     @Override
-    public CreateOrderAggregate queryOrder(String orderId) {
-        return orderRepository.queryOrder(orderId);
+    public void reconcileOrder(String id) {
+        CreateOrderAggregate aggregate = queryOrder(id);
+        if (aggregate == null) throw new IllegalArgumentException("Order not found");
+        OrderEntity order = aggregate.getOrder();
+        if (order.getOrderStatus() == OrderStatusVO.COMPLETED) return;
+        if (order.getOrderStatus() == OrderStatusVO.WAIT) { deliverGoods(id); return; }
+        if (order.getPayTypeVO() != PayTypeVO.ALIPAY_SANDBOX) return;
+        PaymentStrategy strategy = paymentStrategies.get(order.getPayTypeVO());
+        PaymentResult result = strategy.query(id);
+        if (result.isPaid()) {
+            changeOrderPaySuccess(id, result.getTransactionId(), result.getAmount(), result.getPaidAt());
+            deliverGoods(id);
+        } else if (result.isClosed()) {
+            changeOrderClose(id);
+        } else if (order.getOrderStatus() == OrderStatusVO.CREATE &&
+                System.currentTimeMillis() >= order.getOrderTime().getTime() + 30 * 60_000L) {
+            // Close at the provider first; a failed/uncertain close is retried, never assumed.
+            if (strategy.close(id)) changeOrderClose(id);
+        }
     }
 
-    @Override
-    public void deliverGoods(String orderId) {
-        orderRepository.deliverGoods(orderId);
-    }
-
-    @Override
-    public List<String> queryReplenishmentOrder() {
-        return orderRepository.queryReplenishmentOrder();
-    }
-
-    @Override
-    public List<String> queryNoPayNotifyOrder() {
-        return orderRepository.queryNoPayNotifyOrder();
-    }
-
-    @Override
-    public List<String> queryTimeoutCloseOrderList() {
-        return orderRepository.queryTimeoutCloseOrderList();
-    }
-
-    @Override
-    public boolean changeOrderClose(String orderId) {
-        return orderRepository.changeOrderClose(orderId);
-    }
-
-    @Override
-    public List<ProductEntity> queryProductList() {
-        return orderRepository.queryProductList();
-    }
-
-    @Override
-    public void rebateGoods(String openid, String orderId) {
-        port.rebate(openid, orderId);
-    }
-
+    @Override public CreateOrderAggregate queryOrder(String id) { return orderRepository.queryOrder(id); }
+    @Override public void deliverGoods(String id) { orderRepository.deliverGoods(id); }
+    @Override public List<String> queryReplenishmentOrder() { return orderRepository.queryReplenishmentOrder(); }
+    @Override public List<String> queryNoPayNotifyOrder() { return orderRepository.queryNoPayNotifyOrder(); }
+    @Override public List<String> queryTimeoutCloseOrderList() { return orderRepository.queryTimeoutCloseOrderList(); }
+    @Override public boolean changeOrderClose(String id) { return orderRepository.changeOrderClose(id); }
+    @Override public List<ProductEntity> queryProductList() { return orderRepository.queryProductList(); }
+    @Override public void rebateGoods(String openid, String id) { port.rebate(openid, id); }
 }
