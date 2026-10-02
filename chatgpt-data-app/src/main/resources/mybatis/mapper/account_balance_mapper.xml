@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.bugstack.chatgpt.data.infrastructure.dao.IBalanceGrantDao">
+
+    <resultMap id="balanceGrantMap"
+               type="cn.bugstack.chatgpt.data.infrastructure.dao.po.BalanceGrantPO">
+        <id column="id" property="id"/>
+        <result column="app_id" property="appId"/>
+        <result column="request_id" property="requestId"/>
+        <result column="openid" property="openid"/>
+        <result column="amount" property="amount"/>
+        <result column="source" property="source"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <insert id="insertIgnore"
+            parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.BalanceGrantPO">
+        INSERT IGNORE INTO balance_grant(
+            app_id, request_id, openid, amount, source, create_time
+        ) VALUES(
+            #{appId}, #{requestId}, #{openid}, #{amount}, #{source}, now()
+        )
+    </insert>
+
+    <select id="query" resultMap="balanceGrantMap">
+        SELECT id, app_id, request_id, openid, amount, source, create_time
+        FROM balance_grant
+        WHERE app_id = #{appId} AND request_id = #{requestId}
+        FOR UPDATE
+    </select>
+
+</mapper>
