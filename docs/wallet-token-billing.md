@@ -6,9 +6,9 @@
 
 ### 商品和订单快照
 
-- `openai_product.credit_amount` 表示一次购买要充值到 CNY 钱包的金额；当前种子商品的 `credit_amount` 等于 `price`，新钱包商品的旧 `quota` 保持为 `0`。实付价与到账金额是独立字段，页面分别展示，不能混用。
-- 当前种子商品 `1001`、`1002`、`1003` 的充值金额分别为 `9.90`、`29.90`、`99.90` CNY；名称和描述使用充值语义，不再承诺次数。
-- 创建订单时把当前商品金额写入 `openai_order.product_credit_amount`。这是订单快照，不能在发货时重新读取商品价格。
+- `openai_product.credit_amount` 表示扣除充值手续费后的 CNY 钱包到账金额，新钱包商品的旧 `quota` 保持为 `0`。商品查询和下单统一按实付 `price` 计算手续费，不对已有净额再次扣费。
+- 当前种子商品 `1001`、`1002`、`1003` 的实付金额分别为 `9.90`、`29.90`、`99.90` CNY，净到账分别为 `7.92`、`23.92`、`89.91` CNY。
+- 创建订单时把净到账金额写入 `openai_order.product_credit_amount`，手续费率和金额写入 `product_fee_rate`、`product_fee_amount`。这是订单快照，不能在发货时重新读取商品价格或套用新费率。详细规则见 [充值手续费](recharge-service-fee.md)。
 - `product_credit_amount IS NULL` 只表示历史额度订单。历史订单不转换，仍按原有 `product_quota` 发货；非空快照才走钱包充值。
 - 新聊天仍然优先消耗 `user_account.surplus_quota` 中的历史剩余额度。只有额度 CAS 扣减失败且请求有 Token 计费报价时，才预授权钱包。
 
@@ -111,8 +111,9 @@ ZHIPU_FLASH_OUTPUT_PRICE         # 默认 2.8
 2. 执行 `chat_quota_request.sql`，创建聊天预授权账本。
 3. 执行 `wallet_purchase.sql`，增加商品金额和订单金额快照列，并更新新商品种子数据。
 4. 执行 `wallet_chat_billing.sql`，增加 Token 费率、usage、hold 和结算字段。
+5. 执行 `recharge_fee.sql`，增加手续费快照列，并将当前钱包商品更新为净到账金额。
 
-两个新增迁移均按 `information_schema` 检查后执行 `ALTER TABLE`，可以重复运行。它们不重写历史订单：历史订单的 `product_credit_amount` 保持 `NULL`，历史聊天记录的 `charge_amount` 也保持 `NULL`，继续使用原有次数语义。不要用重新导入或 `DROP TABLE` 的方式替代迁移；生产执行前先备份并确认数据库、表和列名。
+这些迁移均按 `information_schema` 检查后执行 `ALTER TABLE`，可以重复运行。它们不重写历史订单：历史次数订单的 `product_credit_amount` 保持 `NULL`，历史聊天记录的 `charge_amount` 也保持 `NULL`，继续使用原有次数语义；手续费上线前的余额订单保留原到账金额，手续费快照保持 `NULL`。不要用重新导入或 `DROP TABLE` 的方式替代迁移；生产执行前先备份并确认数据库、表和列名。
 
 `docs/dev-ops/environment/sql/` 中的 SQL 是内部部署 helper，不是公开 API，也不能通过 HTTP/Dubbo 暴露任意 SQL 执行能力。仅由受控的发布/运维流程执行，并记录执行顺序和数据库版本。
 
