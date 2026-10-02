@@ -41,10 +41,6 @@ public class SensitiveWordFilter implements ILogicFilter<UserAccountQuotaEntity>
                     .type(LogicCheckTypeVO.SUCCESS).data(chatProcess).build();
         }
 
-        ChatProcessAggregate newChatProcessAggregate = new ChatProcessAggregate();
-        newChatProcessAggregate.setOpenid(chatProcess.getOpenid());
-        newChatProcessAggregate.setModel(chatProcess.getModel());
-
         List<MessageEntity> newMessages = chatProcess.getMessages().stream()
                 .map(message -> {
                     String content = message.getContent();
@@ -57,11 +53,12 @@ public class SensitiveWordFilter implements ILogicFilter<UserAccountQuotaEntity>
                 })
                 .collect(Collectors.toList());
 
-        newChatProcessAggregate.setMessages(newMessages);
+        // Keep request identity and quota reservation shared throughout the rule chain.
+        chatProcess.setMessages(newMessages);
 
         return RuleLogicEntity.<ChatProcessAggregate>builder()
                 .type(LogicCheckTypeVO.SUCCESS)
-                .data(newChatProcessAggregate)
+                .data(chatProcess)
                 .build();
     }
 
