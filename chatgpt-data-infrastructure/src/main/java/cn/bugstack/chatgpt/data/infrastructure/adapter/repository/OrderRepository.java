@@ -8,10 +8,15 @@ import cn.bugstack.chatgpt.data.domain.order.model.valobj.PayStatusVO;
 import cn.bugstack.chatgpt.data.domain.order.adapter.repository.IOrderRepository;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IOpenAIOrderDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IOpenAIProductDao;
+import cn.bugstack.chatgpt.data.infrastructure.dao.IAccountWalletDao;
+import cn.bugstack.chatgpt.data.infrastructure.dao.IBalanceGrantDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IUserAccountDao;
+import cn.bugstack.chatgpt.data.infrastructure.dao.po.AccountWalletPO;
+import cn.bugstack.chatgpt.data.infrastructure.dao.po.BalanceGrantPO;
 import cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIOrderPO;
 import cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIProductPO;
 import cn.bugstack.chatgpt.data.infrastructure.dao.po.UserAccountPO;
+import cn.bugstack.chatgpt.data.domain.account.model.valobj.AccountBalanceVO;
 import cn.bugstack.chatgpt.data.types.enums.OpenAIProductEnableModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
@@ -33,6 +38,9 @@ import java.util.List;
 @Repository
 public class OrderRepository implements IOrderRepository {
 
+    private static final String PAYMENT_APP_ID = "payment";
+    private static final String WALLET_GRANT_SOURCE = "wallet_purchase";
+
     @Value("${app.config.model-types:deepseek-flash,deepseek-v4-pro,glm-5.3-flash}")
     private String modelTypes;
     @Resource
@@ -41,6 +49,10 @@ public class OrderRepository implements IOrderRepository {
     private IOpenAIProductDao openAIProductDao;
     @Resource
     private IUserAccountDao userAccountDao;
+    @Resource
+    private IAccountWalletDao accountWalletDao;
+    @Resource
+    private IBalanceGrantDao balanceGrantDao;
 
     @Override
     public UnpaidOrderEntity queryUnpaidOrder(ShopCartEntity shopCartEntity) {
@@ -49,6 +61,10 @@ public class OrderRepository implements IOrderRepository {
         openAIOrderPOReq.setProductId(shopCartEntity.getProductId());
         openAIOrderPOReq.setPayType(shopCartEntity.getPayType().getCode());
         openAIOrderPOReq.setOrderTime(new Date(System.currentTimeMillis() - 30 * 60_000L));
+        OpenAIProductPO currentProduct = openAIProductDao.queryProductByProductId(shopCartEntity.getProductId());
+        if (currentProduct == null) return null;
+        openAIOrderPOReq.setProductCreditAmount(currentProduct.getCreditAmount());
+        openAIOrderPOReq.setTotalAmount(currentProduct.getPrice());
         OpenAIOrderPO openAIOrderPORes = openAIOrderDao.queryUnpaidOrder(openAIOrderPOReq);
         if (null == openAIOrderPORes) return null;
         return UnpaidOrderEntity.builder()
@@ -71,6 +87,7 @@ public class OrderRepository implements IOrderRepository {
         productEntity.setProductDesc(openAIProductPO.getProductDesc());
         productEntity.setQuota(openAIProductPO.getQuota());
         productEntity.setPrice(openAIProductPO.getPrice());
+        productEntity.setCreditAmount(openAIProductPO.getCreditAmount());
         productEntity.setEnable(OpenAIProductEnableModel.get(openAIProductPO.getIsEnabled()));
         return productEntity;
     }
@@ -85,6 +102,7 @@ public class OrderRepository implements IOrderRepository {
         openAIOrderPO.setProductId(product.getProductId());
         openAIOrderPO.setProductName(product.getProductName());
         openAIOrderPO.setProductQuota(product.getQuota());
+        openAIOrderPO.setProductCreditAmount(product.getCreditAmount());
         openAIOrderPO.setOrderId(order.getOrderId());
         openAIOrderPO.setOrderTime(order.getOrderTime());
         openAIOrderPO.setOrderStatus(order.getOrderStatus().getCode());
@@ -125,6 +143,7 @@ public class OrderRepository implements IOrderRepository {
         product.setProductId(openAIOrderPO.getProductId());
         product.setProductName(openAIOrderPO.getProductName());
         product.setQuota(openAIOrderPO.getProductQuota());
+        product.setCreditAmount(openAIOrderPO.getProductCreditAmount());
 
         OrderEntity order = new OrderEntity();
         order.setOrderId(openAIOrderPO.getOrderId());
@@ -145,12 +164,73 @@ public class OrderRepository implements IOrderRepository {
     @Transactional(rollbackFor = Exception.class, timeout = 350, propagation = Propagation.REQUIRED, isolation = Isolation.DEFAULT)
     public void deliverGoods(String orderId) {
         OpenAIOrderPO openAIOrderPO = openAIOrderDao.queryOrder(orderId);
+        if (openAIOrderPO == null) return;
 
         // 1. 变更发货状态
         int updateOrderStatusDeliverGoodsCount = openAIOrderDao.updateOrderStatusDeliverGoods(orderId);
         if (updateOrderStatusDeliverGoodsCount == 0) return;
 
-        // 2. 账户额度变更
+        if (openAIOrderPO.getProductCreditAmount() != null) {
+            // Wallet purchases still need a legacy account row for the chat path, but never add quota.
+            ensureAccountWithoutQuota(openAIOrderPO.getOpenid());
+            grantWalletBalance(openAIOrderPO);
+            return;
+        }
+
+        // 2. Historical orders keep their quota delivery semantics.
+        deliverLegacyQuota(openAIOrderPO);
+    }
+
+    private void ensureAccountWithoutQuota(String openid) {
+        UserAccountPO userAccountPO = userAccountDao.queryUserAccount(openid);
+        if (userAccountPO != null) return;
+
+        UserAccountPO userAccountPOReq = new UserAccountPO();
+        userAccountPOReq.setOpenid(openid);
+        userAccountPOReq.setTotalQuota(0);
+        userAccountPOReq.setSurplusQuota(0);
+        userAccountPOReq.setStatus(UserAccountStatusVO.AVAILABLE.getCode());
+        userAccountPOReq.setModelTypes(modelTypes);
+        userAccountDao.insert(userAccountPOReq);
+    }
+
+    private void grantWalletBalance(OpenAIOrderPO order) {
+        BigDecimal creditAmount = order.getProductCreditAmount();
+        if (creditAmount.signum() <= 0) {
+            throw new IllegalStateException("Wallet purchase credit amount must be positive");
+        }
+
+        BalanceGrantPO grant = BalanceGrantPO.builder()
+                .appId(PAYMENT_APP_ID)
+                .requestId(order.getOrderId())
+                .openid(order.getOpenid())
+                .amount(creditAmount)
+                .source(WALLET_GRANT_SOURCE)
+                .build();
+        int inserted = balanceGrantDao.insertIgnore(grant);
+        if (inserted == 1) {
+            int walletRows = accountWalletDao.addOrCreateWallet(AccountWalletPO.builder()
+                    .openid(order.getOpenid())
+                    .currency(AccountBalanceVO.CURRENCY_CNY)
+                    .availableAmount(creditAmount)
+                    .totalAmount(creditAmount)
+                    .build());
+            if (walletRows < 1) {
+                throw new IllegalStateException("Unable to apply wallet purchase");
+            }
+            return;
+        }
+
+        BalanceGrantPO existing = balanceGrantDao.query(PAYMENT_APP_ID, order.getOrderId());
+        if (existing == null
+                || !order.getOpenid().equals(existing.getOpenid())
+                || existing.getAmount() == null
+                || creditAmount.compareTo(existing.getAmount()) != 0) {
+            throw new IllegalStateException("Wallet purchase grant payload does not match order");
+        }
+    }
+
+    private void deliverLegacyQuota(OpenAIOrderPO openAIOrderPO) {
         UserAccountPO userAccountPO = userAccountDao.queryUserAccount(openAIOrderPO.getOpenid());
         UserAccountPO userAccountPOReq = new UserAccountPO();
         userAccountPOReq.setOpenid(openAIOrderPO.getOpenid());
@@ -197,6 +277,7 @@ public class OrderRepository implements IOrderRepository {
             productEntity.setProductDesc(openAIProductPO.getProductDesc());
             productEntity.setQuota(openAIProductPO.getQuota());
             productEntity.setPrice(openAIProductPO.getPrice());
+            productEntity.setCreditAmount(openAIProductPO.getCreditAmount());
             productEntityList.add(productEntity);
         }
         return productEntityList;

@@ -29,6 +29,8 @@ public class OpenAIOrderPO {
     private String productName;
     /** 商品额度 */
     private Integer productQuota;
+    /** 钱包充值金额快照；为空表示历史额度订单 */
+    private BigDecimal productCreditAmount;
     /** 订单编号 */
     private String orderId;
     /** 下单时间 */

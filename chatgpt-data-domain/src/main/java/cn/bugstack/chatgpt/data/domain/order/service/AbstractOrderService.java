@@ -14,7 +14,9 @@ public abstract class AbstractOrderService implements IOrderService {
     public PayOrderEntity createOrder(ShopCartEntity cart) {
         paymentStrategies.get(cart.getPayType()).checkAvailable();
         ProductEntity product = orderRepository.queryProduct(cart.getProductId());
-        if (product == null || !product.isAvailable() || product.getPrice().signum() <= 0) {
+        if (product == null || !product.isAvailable() || product.getPrice() == null
+                || product.getPrice().signum() <= 0
+                || (product.getCreditAmount() != null && product.getCreditAmount().signum() <= 0)) {
             throw new IllegalArgumentException("Product unavailable");
         }
         UnpaidOrderEntity unpaid = orderRepository.queryUnpaidOrder(cart);

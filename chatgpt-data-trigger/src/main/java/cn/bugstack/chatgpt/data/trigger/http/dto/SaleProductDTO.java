@@ -38,5 +38,9 @@ public class SaleProductDTO {
      * 商品价格
      */
     private BigDecimal price;
+    /**
+     * 钱包充值金额；为空表示历史额度商品
+     */
+    private BigDecimal creditAmount;
 
 }

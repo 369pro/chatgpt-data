@@ -40,6 +40,10 @@ public class ProductEntity {
      */
     private BigDecimal price;
     /**
+     * 钱包充值金额；为空表示历史额度商品
+     */
+    private BigDecimal creditAmount;
+    /**
      * 商品状态；0无效、1有效
      */
     private OpenAIProductEnableModel enable;

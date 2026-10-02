@@ -26,7 +26,8 @@ public class SaleController {
         if (!authService.checkToken(token)) return loginRequired();
         List<SaleProductDTO> products = orderService.queryProductList().stream().map(p ->
                 SaleProductDTO.builder().productId(p.getProductId()).productName(p.getProductName())
-                        .productDesc(p.getProductDesc()).price(p.getPrice()).quota(p.getQuota()).build()
+                        .productDesc(p.getProductDesc()).price(p.getPrice()).quota(p.getQuota())
+                        .creditAmount(p.getCreditAmount()).build()
         ).collect(Collectors.toList());
         return success(products);
     }
@@ -94,6 +95,7 @@ public class SaleController {
         data.put("channel", order.getPayTypeVO().name());
         data.put("amount", order.getTotalAmount());
         data.put("quota", aggregate.getProduct().getQuota());
+        data.put("creditAmount", aggregate.getProduct().getCreditAmount());
         data.put("productName", aggregate.getProduct().getProductName());
         data.put("expiresAt", order.getOrderTime().getTime() + 30 * 60_000L);
         return data;

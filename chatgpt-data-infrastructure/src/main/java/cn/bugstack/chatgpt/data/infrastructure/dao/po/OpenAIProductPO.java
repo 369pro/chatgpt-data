@@ -44,6 +44,10 @@ public class OpenAIProductPO {
      */
     private BigDecimal price;
     /**
+     * 钱包充值金额；为空表示历史额度商品
+     */
+    private BigDecimal creditAmount;
+    /**
      * 商品排序
      */
     private Integer sort;
