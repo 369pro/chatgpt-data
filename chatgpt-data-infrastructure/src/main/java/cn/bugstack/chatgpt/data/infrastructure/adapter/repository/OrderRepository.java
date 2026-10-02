@@ -33,7 +33,7 @@ import java.util.List;
 @Repository
 public class OrderRepository implements IOrderRepository {
 
-    @Value("${app.config.model-types:glm-4,gpt-4,gpt-3.5-turbo}")
+    @Value("${app.config.model-types:deepseek-flash,deepseek-v4-pro,glm-5.3-flash}")
     private String modelTypes;
     @Resource
     private IOpenAIOrderDao openAIOrderDao;

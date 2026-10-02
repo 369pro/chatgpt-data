@@ -1,0 +1,33 @@
+llm:
+  providers:
+    deepseek:
+      adapter: openai-compatible
+      base-url: ${DEEPSEEK_API_HOST:https://api.deepseek.com/}
+      api-key: ${DEEPSEEK_API_KEY:}
+    zhipu:
+      enabled: ${ZHIPU_ENABLED:false}
+      adapter: openai-compatible
+      base-url: ${ZHIPU_API_HOST:https://open.bigmodel.cn/api/paas/v4/chat/completions}
+      api-key: ${ZHIPU_API_KEY:}
+      request-options:
+        thinking:
+          type: enabled
+        reasoning_effort: low
+        max_tokens: 8192
+  models:
+    - id: deepseek-flash
+      display-name: DeepSeek V4.1 Flash
+      provider: deepseek
+      upstream-model: deepseek-flash
+    - id: deepseek-v4-pro
+      display-name: DeepSeek V4 Pro
+      provider: deepseek
+      upstream-model: deepseek-v4-pro
+    - id: glm-5.3-flash
+      display-name: GLM-5.3-Flash
+      provider: zhipu
+      upstream-model: glm-5.3-flash
+  aliases:
+    deepseek-chat: deepseek-flash
+    deepseek-reasoner: deepseek-flash
+    deepseek-v4-flash: deepseek-flash

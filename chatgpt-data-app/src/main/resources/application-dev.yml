@@ -21,6 +21,7 @@ app:
     limit-count: 10
     # 白名单，不做频次拦截【微信的openai】oxfA9w8-23yvwTmo2ombz0E4zJv4
     white-list: ojbZUv18lbmriaTjcCWBYkOrSbHA
+    model-types: ${APP_MODEL_TYPES:deepseek-flash,deepseek-v4-pro,glm-5.3-flash}
     # 模型
     model-types: glm-4,gpt-4,gpt-3.5-turbo
     # 接口 appId、appToken - 调用 big-market 分配参数
