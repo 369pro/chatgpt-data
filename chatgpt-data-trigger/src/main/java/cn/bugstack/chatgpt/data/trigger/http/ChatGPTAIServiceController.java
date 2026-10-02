@@ -8,9 +8,9 @@ import cn.bugstack.chatgpt.data.trigger.http.dto.ChatGPTRequestDTO;
 import cn.bugstack.chatgpt.data.types.common.Constants;
 import cn.bugstack.chatgpt.data.types.exception.ChatGPTException;
 import cn.bugstack.chatgpt.data.types.model.Response;
-import com.alibaba.fastjson.JSON;
-import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
-import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
+import cn.bugstack.chatgpt.data.domain.openai.service.ChatProviderRegistry;
+import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
@@ -18,6 +18,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -36,6 +37,19 @@ public class ChatGPTAIServiceController {
 
     @Resource
     private IAuthService authService;
+
+    @Resource
+    private ChatProviderRegistry providers;
+
+    @GetMapping("models")
+    public List<Map<String, String>> models() {
+        return providers.models().stream().map(model -> Map.of("id", model.getId(),
+                "displayName", model.getDisplayName(), "provider", model.getProvider(),
+                "inputPrice", model.getInputPrice().toPlainString(),
+                "cachedInputPrice", model.getCachedInputPrice().toPlainString(),
+                "outputPrice", model.getOutputPrice().toPlainString()))
+                .collect(Collectors.toList());
+    }
 
     /**
      * 【apix.natapp1.cc 是我在 <a href="https://natapp.cn/">https://natapp.cn</a> 购买的渠道，你需要自己购买一个使用】
@@ -69,13 +83,9 @@ public class ChatGPTAIServiceController {
      * "model": "gpt-3.5-turbo"
      * }'
      */
-    @HystrixCommand(commandProperties = {
-            @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "5500")
-    }, fallbackMethod = "completionsStreamError"
-    )
     @RequestMapping(value = "chat/completions", method = RequestMethod.POST)
-    public ResponseBodyEmitter completionsStream(@RequestBody ChatGPTRequestDTO request, @RequestHeader("Authorization") String token, HttpServletResponse response) {
-        log.info("流式问答请求开始，使用模型：{} 请求信息：{}", request.getModel(), JSON.toJSONString(request.getMessages()));
+    public ResponseBodyEmitter completionsStream(@RequestBody ChatGPTRequestDTO request, @RequestHeader(value = "Authorization", required = false) String token, HttpServletResponse response) {
+        log.info("流式问答请求开始，使用模型：{}", request.getModel());
         try {
             // 1. 基础配置；流式输出、编码、禁用缓存
             response.setContentType("text/event-stream");
@@ -84,14 +94,34 @@ public class ChatGPTAIServiceController {
 
             // 2. 构建异步响应对象【对 Token 过期拦截】
             ResponseBodyEmitter emitter = new ResponseBodyEmitter(3 * 60 * 1000L);
-            boolean success = authService.checkToken(token);
+            boolean success = token != null && authService.checkToken(token);
 
             if (!success) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 try {
                     emitter.send(Constants.ResponseCode.TOKEN_ERROR.getCode());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
+                emitter.complete();
+                return emitter;
+            }
+
+            boolean supported;
+            try {
+                providers.model(request.getModel());
+                supported = true;
+            } catch (IllegalArgumentException invalid) {
+                supported = false;
+            }
+            if (!supported || request.getMessages() == null || request.getMessages().isEmpty()
+                    || request.getMessages().stream().anyMatch(message -> message == null
+                    || message.getContent() == null || message.getRole() == null
+                    || !("user".equals(message.getRole()) || "assistant".equals(message.getRole())
+                    || "system".equals(message.getRole())))
+                    || (request.getRequestId() != null && !request.getRequestId().matches("[A-Za-z0-9_-]{1,64}"))) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                emitter.send("\n[错误] 请求参数无效，请选择可用的对话模型。");
                 emitter.complete();
                 return emitter;
             }
@@ -103,6 +133,8 @@ public class ChatGPTAIServiceController {
             // 4. 构建参数
             ChatProcessAggregate chatProcessAggregate = ChatProcessAggregate.builder()
                     .openid(openid)
+                    .requestId(request.getRequestId() == null ? UUID.randomUUID().toString() : request.getRequestId())
+                    .thinking(request.isThinking() || "deepseek-reasoner".equals(request.getModel()))
                     .model(request.getModel())
                     .messages(request.getMessages().stream()
                             .map(entity -> MessageEntity.builder()

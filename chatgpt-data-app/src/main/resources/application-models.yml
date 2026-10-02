@@ -17,14 +17,24 @@ llm:
       display-name: DeepSeek V4.1 Flash
       provider: deepseek
       upstream-model: deepseek-flash
+      input-price: ${DEEPSEEK_FLASH_INPUT_PRICE:2.0}
+      cached-input-price: ${DEEPSEEK_FLASH_CACHE_PRICE:0.04}
+      output-price: ${DEEPSEEK_FLASH_OUTPUT_PRICE:8.0}
     - id: deepseek-v4-pro
       display-name: DeepSeek V4 Pro
       provider: deepseek
       upstream-model: deepseek-v4-pro
+      input-price: ${DEEPSEEK_PRO_INPUT_PRICE:9.0}
+      cached-input-price: ${DEEPSEEK_PRO_CACHE_PRICE:0.30}
+      output-price: ${DEEPSEEK_PRO_OUTPUT_PRICE:27.0}
     - id: glm-5.3-flash
       display-name: GLM-5.3-Flash
       provider: zhipu
       upstream-model: glm-5.3-flash
+      input-price: ${ZHIPU_FLASH_INPUT_PRICE:0.8}
+      cached-input-price: ${ZHIPU_FLASH_CACHE_PRICE:0.23}
+      output-price: ${ZHIPU_FLASH_OUTPUT_PRICE:2.8}
+      max-output-tokens: 8192
   aliases:
     deepseek-chat: deepseek-flash
     deepseek-reasoner: deepseek-flash

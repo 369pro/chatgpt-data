@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.bugstack.chatgpt.data.infrastructure.dao.IChatQuotaDao">
+
+    <resultMap id="chatQuotaMap" type="cn.bugstack.chatgpt.data.infrastructure.dao.po.ChatQuotaPO">
+        <id column="id" property="id"/>
+        <result column="openid" property="openid"/>
+        <result column="request_id" property="requestId"/>
+        <result column="status" property="status"/>
+        <result column="charge_amount" property="chargeAmount"/>
+        <result column="model" property="model"/>
+        <result column="input_price" property="inputPrice"/>
+        <result column="cached_input_price" property="cachedInputPrice"/>
+        <result column="output_price" property="outputPrice"/>
+        <result column="settled_amount" property="settledAmount"/>
+        <result column="prompt_tokens" property="promptTokens"/>
+        <result column="completion_tokens" property="completionTokens"/>
+        <result column="cached_prompt_tokens" property="cachedPromptTokens"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insertReservation"
+            parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.ChatQuotaPO">
+        INSERT INTO chat_quota_request(
+            openid, request_id, status, model, input_price, cached_input_price, output_price, create_time, update_time
+        )
+        VALUES(
+            #{openid}, #{requestId}, #{status}, #{model}, #{inputPrice}, #{cachedInputPrice}, #{outputPrice}, now(), now()
+        )
+    </insert>
+
+    <update id="decrementUserQuota" parameterType="java.lang.String">
+        UPDATE user_account
+        SET surplus_quota = surplus_quota - 1,
+            update_time = now()
+        WHERE openid = #{openid}
+          AND surplus_quota > 0
+          AND status = 0
+    </update>
+
+    <update id="confirmReservation">
+        UPDATE chat_quota_request
+        SET status = 1,
+            update_time = now()
+        WHERE openid = #{openid}
+          AND request_id = #{requestId}
+          AND status = 0
+          AND charge_amount IS NULL
+    </update>
+
+    <update id="debitWallet">
+        UPDATE account_wallet w INNER JOIN user_account u ON u.openid = w.openid
+        SET w.available_amount = w.available_amount - #{amount}, w.update_time = now()
+        WHERE w.openid = #{openid} AND w.currency = 'CNY'
+          AND w.available_amount &gt;= #{amount} AND u.status = 0
+    </update>
+
+    <update id="recordWalletCharge">
+        UPDATE chat_quota_request SET charge_amount = #{amount}
+        WHERE openid = #{openid} AND request_id = #{requestId} AND status = 0
+    </update>
+
+    <select id="queryReservation" resultMap="chatQuotaMap">
+        SELECT * FROM chat_quota_request WHERE openid = #{openid} AND request_id = #{requestId}
+        FOR UPDATE
+    </select>
+
+    <update id="refundWallet">
+        UPDATE account_wallet SET available_amount = available_amount + #{amount}, update_time = now()
+        WHERE openid = #{openid} AND currency = 'CNY'
+    </update>
+
+    <update id="recordSettlement">
+        UPDATE chat_quota_request
+        SET status = #{status}, settled_amount = #{settledAmount}, prompt_tokens = #{promptTokens},
+            completion_tokens = #{completionTokens}, cached_prompt_tokens = #{cachedPromptTokens}, update_time = now()
+        WHERE openid = #{openid} AND request_id = #{requestId} AND status = 0
+    </update>
+
+    <update id="releaseReservation">
+        UPDATE chat_quota_request
+        SET status = 2,
+            update_time = now()
+        WHERE openid = #{openid}
+          AND request_id = #{requestId}
+          AND status = 0
+    </update>
+
+    <update id="releaseReservationById" parameterType="java.lang.Long">
+        UPDATE chat_quota_request
+        SET status = 2,
+            update_time = now()
+        WHERE id = #{id}
+          AND status = 0
+    </update>
+
+    <update id="refundUserQuota" parameterType="java.lang.String">
+        UPDATE user_account
+        SET surplus_quota = surplus_quota + 1,
+            update_time = now()
+        WHERE openid = #{openid}
+    </update>
+
+    <select id="findExpiredReservations" resultMap="chatQuotaMap">
+        SELECT id, openid, request_id, status, charge_amount, create_time, update_time
+        FROM chat_quota_request
+        WHERE status = 0
+          AND create_time &lt; #{expiredBefore}
+        ORDER BY create_time ASC, id ASC
+        LIMIT #{limit}
+        FOR UPDATE
+    </select>
+
+</mapper>

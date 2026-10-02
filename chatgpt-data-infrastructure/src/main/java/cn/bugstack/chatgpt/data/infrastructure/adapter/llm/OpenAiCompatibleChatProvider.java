@@ -1,6 +1,7 @@
 package cn.bugstack.chatgpt.data.infrastructure.adapter.llm;
 
 import cn.bugstack.chatgpt.data.domain.openai.model.entity.ChatRequest;
+import cn.bugstack.chatgpt.data.domain.openai.model.entity.ChatUsage;
 import cn.bugstack.chatgpt.data.domain.openai.model.entity.MessageEntity;
 import cn.bugstack.chatgpt.data.domain.openai.port.ChatCall;
 import cn.bugstack.chatgpt.data.domain.openai.port.ChatObserver;
@@ -30,7 +31,6 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class OpenAiCompatibleChatProvider implements ChatProvider {
 
     private static final String DEEPSEEK_PROVIDER_ID = "deepseek";
-    private static final int MAX_TOKENS = 4096;
     private static final MediaType JSON_MEDIA_TYPE = MediaType.get("application/json; charset=utf-8");
 
     private final String providerId;
@@ -88,11 +88,24 @@ public final class OpenAiCompatibleChatProvider implements ChatProvider {
 
     private String requestPayload(ChatRequest request) throws JsonProcessingException {
         ObjectNode root = objectMapper.createObjectNode();
-        root.put("max_tokens", MAX_TOKENS);
         root.setAll(requestOptions);
+        // Request-scoped limits win over provider defaults so billing preauthorization
+        // and the upstream generation limit use the same value.
+        root.put("max_tokens", request.getMaxTokens());
         // Routing and messages always come from the validated domain request.
         root.put("model", request.getModel());
         root.put("stream", true);
+
+        JsonNode configuredStreamOptions = root.get("stream_options");
+        final ObjectNode streamOptions;
+        if (configuredStreamOptions == null || configuredStreamOptions.isNull()) {
+            streamOptions = root.putObject("stream_options");
+        } else if (configuredStreamOptions.isObject()) {
+            streamOptions = (ObjectNode) configuredStreamOptions;
+        } else {
+            throw new JsonProcessingException("stream_options must be an object") { };
+        }
+        streamOptions.put("include_usage", true);
 
         ArrayNode messages = root.putArray("messages");
         List<MessageEntity> requestMessages = request.getMessages();
@@ -193,6 +206,8 @@ public final class OpenAiCompatibleChatProvider implements ChatProvider {
     private final class Listener extends EventSourceListener {
         private final ChatObserver observer;
         private final StreamingCall call;
+        private boolean finishSeen;
+        private ChatUsage latestUsage;
 
         private Listener(ChatObserver observer, StreamingCall call) {
             this.observer = observer;
@@ -205,7 +220,7 @@ public final class OpenAiCompatibleChatProvider implements ChatProvider {
                 return;
             }
             if (data != null && "[DONE]".equals(data.trim())) {
-                complete(source);
+                completeIfReady(source);
                 return;
             }
 
@@ -220,6 +235,23 @@ public final class OpenAiCompatibleChatProvider implements ChatProvider {
                 }
             } catch (JsonProcessingException e) {
                 fail(source, "Provider returned malformed SSE data");
+                return;
+            }
+
+            JsonNode providerError = chunk.get("error");
+            if (providerError != null && !providerError.isNull()) {
+                fail(source, "Provider returned an error");
+                return;
+            }
+
+            try {
+                ChatUsage usage = parseUsage(chunk);
+                if (usage != null) {
+                    latestUsage = usage;
+                    observer.onUsage(usage);
+                }
+            } catch (IllegalArgumentException e) {
+                fail(source, "Provider returned malformed usage data");
                 return;
             }
 
@@ -245,7 +277,7 @@ public final class OpenAiCompatibleChatProvider implements ChatProvider {
                 }
             }
             if (finished) {
-                complete(source);
+                finishSeen = true;
             }
         }
 
@@ -260,14 +292,61 @@ public final class OpenAiCompatibleChatProvider implements ChatProvider {
 
         @Override
         public void onClosed(EventSource source) {
-            fail(source, "Provider stream ended before completion");
+            completeIfReady(source);
         }
 
-        private void complete(EventSource source) {
+        private void completeIfReady(EventSource source) {
+            if (!finishSeen || latestUsage == null) {
+                fail(source, "Provider stream ended before completion");
+                return;
+            }
             if (call.terminate()) {
                 source.cancel();
                 observer.onComplete();
             }
+        }
+
+        private ChatUsage parseUsage(JsonNode chunk) {
+            JsonNode usage = chunk.get("usage");
+            if (usage == null || usage.isNull()) {
+                return null;
+            }
+            if (!usage.isObject()) {
+                throw new IllegalArgumentException("usage must be an object");
+            }
+
+            long promptTokens = tokenCount(usage.get("prompt_tokens"), "prompt_tokens");
+            long completionTokens = tokenCount(usage.get("completion_tokens"), "completion_tokens");
+            long cachedPromptTokens = 0;
+
+            JsonNode cacheHitTokens = usage.get("prompt_cache_hit_tokens");
+            if (cacheHitTokens != null && !cacheHitTokens.isNull()) {
+                cachedPromptTokens = tokenCount(cacheHitTokens, "prompt_cache_hit_tokens");
+            } else {
+                JsonNode promptDetails = usage.get("prompt_tokens_details");
+                if (promptDetails != null && !promptDetails.isNull()) {
+                    if (!promptDetails.isObject()) {
+                        throw new IllegalArgumentException("prompt_tokens_details must be an object");
+                    }
+                    JsonNode cachedTokens = promptDetails.get("cached_tokens");
+                    if (cachedTokens != null && !cachedTokens.isNull()) {
+                        cachedPromptTokens = tokenCount(cachedTokens, "cached_tokens");
+                    }
+                }
+            }
+
+            return new ChatUsage(promptTokens, completionTokens, cachedPromptTokens);
+        }
+
+        private long tokenCount(JsonNode value, String name) {
+            if (value == null || value.isNull() || !value.isIntegralNumber() || !value.canConvertToLong()) {
+                throw new IllegalArgumentException(name + " must be an integer");
+            }
+            long count = value.longValue();
+            if (count < 0) {
+                throw new IllegalArgumentException(name + " must be nonnegative");
+            }
+            return count;
         }
 
         private void fail(EventSource source, String message) {

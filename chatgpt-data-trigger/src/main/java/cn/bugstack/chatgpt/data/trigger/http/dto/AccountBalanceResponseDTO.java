@@ -20,6 +20,8 @@ public class AccountBalanceResponseDTO {
     private String currency;
     private String availableAmount;
     private String totalAmount;
+    private String billingMode;
+    private Integer legacyQuota;
 
     public static AccountBalanceResponseDTO from(AccountBalanceVO balance) {
         return AccountBalanceResponseDTO.builder()

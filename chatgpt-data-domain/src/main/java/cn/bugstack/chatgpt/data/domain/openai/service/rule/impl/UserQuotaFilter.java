@@ -3,6 +3,7 @@ package cn.bugstack.chatgpt.data.domain.openai.service.rule.impl;
 import cn.bugstack.chatgpt.data.domain.openai.annotation.LogicStrategy;
 import cn.bugstack.chatgpt.data.domain.openai.model.aggregates.ChatProcessAggregate;
 import cn.bugstack.chatgpt.data.domain.openai.model.entity.RuleLogicEntity;
+import cn.bugstack.chatgpt.data.domain.openai.model.entity.ChatQuotaReservation;
 import cn.bugstack.chatgpt.data.domain.openai.model.entity.UserAccountQuotaEntity;
 import cn.bugstack.chatgpt.data.domain.openai.model.valobj.LogicCheckTypeVO;
 import cn.bugstack.chatgpt.data.domain.openai.repository.IOpenAiRepository;
@@ -12,6 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import cn.bugstack.chatgpt.data.domain.openai.service.ChatProviderRegistry;
+import cn.bugstack.chatgpt.data.domain.openai.model.entity.ChatBillingQuote;
 
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
@@ -25,24 +28,22 @@ public class UserQuotaFilter implements ILogicFilter<UserAccountQuotaEntity> {
 
     @Resource
     private IOpenAiRepository openAiRepository;
+    @Resource
+    private ChatProviderRegistry providers;
 
     @Override
     public RuleLogicEntity<ChatProcessAggregate> filter(ChatProcessAggregate chatProcess, UserAccountQuotaEntity data) throws Exception {
-        if (data.getSurplusQuota() > 0) {
-            // 扣减账户额度；因为是个人账户数据，无资源竞争，所以直接使用数据库也可以。但为了效率，也可以优化为 Redis 扣减。
-            int updateCount = openAiRepository.subAccountQuota(data.getOpenid());
-            if (0 != updateCount) {
+            ChatBillingQuote quote = ChatBillingQuote.from(providers.model(chatProcess.getModel()),
+                    chatProcess.getMessages());
+            if (openAiRepository.reserveChatQuota(data.getOpenid(), chatProcess.getRequestId(), quote)) {
+                chatProcess.setQuotaReservation(ChatQuotaReservation.tokenBilling(
+                        openAiRepository, data.getOpenid(), chatProcess.getRequestId()));
                 return RuleLogicEntity.<ChatProcessAggregate>builder()
                         .type(LogicCheckTypeVO.SUCCESS).data(chatProcess).build();
             }
 
-            return RuleLogicEntity.<ChatProcessAggregate>builder()
-                    .info("个人账户，总额度【" + data.getTotalQuota() + "】次，已耗尽！")
-                    .type(LogicCheckTypeVO.REFUSE).data(chatProcess).build();
-        }
-
         return RuleLogicEntity.<ChatProcessAggregate>builder()
-                .info("个人账户，总额度【" + data.getTotalQuota() + "】次，已耗尽！")
+                .info("余额不足以预冻结本次请求费用，请充值或缩短上下文后重试。")
                 .type(LogicCheckTypeVO.REFUSE).data(chatProcess).build();
     }
 
