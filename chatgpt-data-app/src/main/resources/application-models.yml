@@ -1,12 +1,10 @@
 llm:
   providers:
     deepseek:
-      adapter: openai-compatible
       base-url: ${DEEPSEEK_API_HOST:https://api.deepseek.com/}
       api-key: ${DEEPSEEK_API_KEY:}
     zhipu:
       enabled: ${ZHIPU_ENABLED:false}
-      adapter: openai-compatible
       base-url: ${ZHIPU_API_HOST:https://open.bigmodel.cn/api/paas/v4/chat/completions}
       api-key: ${ZHIPU_API_KEY:}
       request-options:
