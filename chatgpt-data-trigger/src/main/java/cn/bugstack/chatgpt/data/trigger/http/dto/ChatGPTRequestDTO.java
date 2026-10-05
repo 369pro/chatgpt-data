@@ -20,7 +20,10 @@ import java.util.List;
 public class ChatGPTRequestDTO {
 
     /** 默认模型 */
-    private String model = ChatGPTModel.GPT_3_5_TURBO.getCode();
+    @Builder.Default
+    private String model = ChatGPTModel.DEEPSEEK_CHAT.getCode();
+    private String requestId;
+    private boolean thinking;
 
     /** 问题描述 */
     private List<MessageEntity> messages;

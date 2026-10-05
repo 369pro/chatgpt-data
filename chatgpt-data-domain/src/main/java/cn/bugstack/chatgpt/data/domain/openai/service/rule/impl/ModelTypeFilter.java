@@ -29,7 +29,9 @@ public class ModelTypeFilter implements ILogicFilter<UserAccountQuotaEntity> {
         String modelType = chatProcess.getModel();
 
         // 2. 模型校验通过
-        if (allowModelTypeList.contains(modelType)) {
+        if (allowModelTypeList.contains(modelType) || ("deepseek-flash".equals(modelType)
+                && (allowModelTypeList.contains("deepseek-chat") || allowModelTypeList.contains("deepseek-reasoner")
+                || allowModelTypeList.contains("deepseek-v4-flash")))) {
             return RuleLogicEntity.<ChatProcessAggregate>builder()
                     .type(LogicCheckTypeVO.SUCCESS)
                     .data(chatProcess)

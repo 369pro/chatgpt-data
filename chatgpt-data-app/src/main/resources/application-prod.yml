@@ -56,16 +56,6 @@ thread:
         policy: CallerRunsPolicy
 
 
-# ChatGLM SDK Config
-chatglm:
-  sdk:
-    config:
-      # 状态；true = 开启、false 关闭
-      enabled: true
-      # 官网地址
-      api-host: https://open.bigmodel.cn/
-      # 官网申请 https://open.bigmodel.cn/usercenter/apikeys - 自己可申请(默认18块的额度很够用)，也推荐测试学习的时候，使用 ChatGLM
-      api-secret-key: REDACTED
 
 # 微信公众号配置信息
 # originalid：原始ID

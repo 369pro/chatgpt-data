@@ -26,9 +26,16 @@ import java.util.UUID;
 public abstract class AbstractAuthService implements IAuthService {
 
     /** SecretKey 要替换为你自己的，并且最好是通过配置的方式使用 */
-    private static final String defaultBase64EncodedSecretKey = "B*B^D%fe";
-    private final String base64EncodedSecretKey = Base64.encodeBase64String(defaultBase64EncodedSecretKey.getBytes());
-    private final Algorithm algorithm = Algorithm.HMAC256(Base64.decodeBase64(Base64.encodeBase64String(defaultBase64EncodedSecretKey.getBytes())));
+    private String base64EncodedSecretKey;
+    private Algorithm algorithm;
+
+    @org.springframework.beans.factory.annotation.Value("${APP_JWT_SECRET}")
+    public void configureJwtSecret(String secret) {
+        byte[] bytes = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        if (bytes.length < 32) throw new IllegalArgumentException("APP_JWT_SECRET must contain at least 32 bytes");
+        base64EncodedSecretKey = Base64.encodeBase64String(bytes);
+        algorithm = Algorithm.HMAC256(bytes);
+    }
 
     @Override
     public AuthStateEntity doLogin(String code) {
@@ -82,7 +89,7 @@ public abstract class AbstractAuthService implements IAuthService {
 
         JwtBuilder builder = Jwts.builder()
                 // 荷载部分
-                .setClaims(claims)
+                .setClaims(new HashMap<>(claims))
                 // 这个是JWT的唯一标识，一般设置成唯一的，这个方法可以生成唯一标识
                 .setId(UUID.randomUUID().toString())//2.
                 // 签发时间

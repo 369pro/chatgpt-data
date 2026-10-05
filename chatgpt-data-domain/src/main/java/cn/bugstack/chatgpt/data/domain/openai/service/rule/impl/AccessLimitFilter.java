@@ -3,6 +3,8 @@ package cn.bugstack.chatgpt.data.domain.openai.service.rule.impl;
 import cn.bugstack.chatgpt.data.domain.openai.annotation.LogicStrategy;
 import cn.bugstack.chatgpt.data.domain.openai.model.aggregates.ChatProcessAggregate;
 import cn.bugstack.chatgpt.data.domain.openai.model.entity.RuleLogicEntity;
+import cn.bugstack.chatgpt.data.domain.openai.model.entity.ChatQuotaReservation;
+import java.util.concurrent.atomic.AtomicBoolean;
 import cn.bugstack.chatgpt.data.domain.openai.model.entity.UserAccountQuotaEntity;
 import cn.bugstack.chatgpt.data.domain.openai.model.valobj.LogicCheckTypeVO;
 import cn.bugstack.chatgpt.data.domain.openai.service.rule.ILogicFilter;
@@ -47,9 +49,20 @@ public class AccessLimitFilter implements ILogicFilter<UserAccountQuotaEntity> {
         }
 
         // 2. 访问次数判断
-        int visitCount = visitCache.get(openid, () -> 0);
-        if (visitCount < limitCount) {
-            visitCache.put(openid, visitCount + 1);
+        AtomicBoolean reserved = new AtomicBoolean();
+        visitCache.asMap().compute(openid, (key, count) -> {
+            int current = count == null ? 0 : count;
+            if (current < limitCount) {
+                reserved.set(true);
+                return current + 1;
+            }
+            return current;
+        });
+        if (reserved.get()) {
+            chatProcess.setQuotaReservation(new ChatQuotaReservation(delivered -> {
+                if (!delivered) visitCache.asMap().computeIfPresent(openid,
+                        (key, count) -> Math.max(0, count - 1));
+            }));
             return RuleLogicEntity.<ChatProcessAggregate>builder()
                     .type(LogicCheckTypeVO.SUCCESS).data(chatProcess).build();
         }

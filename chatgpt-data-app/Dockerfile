@@ -1,5 +1,5 @@
 # 基础镜像
-FROM openjdk:8-jre-slim
+FROM eclipse-temurin:17-jre
 # 作者
 MAINTAINER xiaofuge
 # 配置

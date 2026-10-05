@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class RebateServiceRPC {
 
-    @DubboReference(interfaceClass = IRebateService.class, version = "1.0")
+    @DubboReference(interfaceClass = IRebateService.class, version = "1.0", check = false)
     private IRebateService rebateService;
 
     @Value("${app.config.big-market.appId}")

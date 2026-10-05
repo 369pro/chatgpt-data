@@ -1,11 +1,10 @@
 package cn.bugstack.chatgpt.data.test.domain.openai;
 
-import cn.bugstack.chatgpt.common.Constants;
 import cn.bugstack.chatgpt.data.domain.openai.model.aggregates.ChatProcessAggregate;
 import cn.bugstack.chatgpt.data.domain.openai.model.entity.MessageEntity;
 import cn.bugstack.chatgpt.data.domain.openai.service.IChatService;
 import cn.bugstack.chatgpt.data.types.enums.ChatGPTModel;
-import cn.bugstack.chatgpt.domain.chat.ChatCompletionRequest;
+import org.junit.Ignore;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -25,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 @Slf4j
 @RunWith(SpringRunner.class)
 @SpringBootTest
+@Ignore("Live provider smoke test is covered by scripts/smoke-chat.mjs")
 public class ChatServiceTest {
 
     @Resource
@@ -35,13 +35,13 @@ public class ChatServiceTest {
 
         ChatProcessAggregate chatProcessAggregate = new ChatProcessAggregate();
         chatProcessAggregate.setOpenid("xfg");
-        chatProcessAggregate.setModel(ChatGPTModel.GLM_4.getCode());
-        chatProcessAggregate.setMessages(Collections.singletonList(MessageEntity.builder().role(Constants.Role.USER.getCode()).content("画一个小狗").build()));
+        chatProcessAggregate.setModel(ChatGPTModel.DEEPSEEK_CHAT.getCode());
+        chatProcessAggregate.setMessages(Collections.singletonList(MessageEntity.builder().role("user").content("你好").build()));
 
         ResponseBodyEmitter completions = chatService.completions(emitter, chatProcessAggregate);
 
         // 等待
-        new CountDownLatch(1).await();
+        new CountDownLatch(1).await(90, java.util.concurrent.TimeUnit.SECONDS);
 
     }
 

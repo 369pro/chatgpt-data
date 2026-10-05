@@ -14,7 +14,8 @@ public enum ChatGPTModel {
 
     /** gpt-3.5-turbo */
     GPT_3_5_TURBO("gpt-3.5-turbo"),
-    GLM_4("glm-4"),
+    DEEPSEEK_CHAT("deepseek-flash"),
+    DEEPSEEK_REASONER("deepseek-v4-pro"),
     /** 文生图 */
     DALL_E_2("dall-e-2"),
     DALL_E_3("dall-e-3"),

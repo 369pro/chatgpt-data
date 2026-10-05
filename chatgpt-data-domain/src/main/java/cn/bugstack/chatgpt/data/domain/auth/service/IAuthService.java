@@ -16,6 +16,12 @@ public interface IAuthService {
      */
     AuthStateEntity doLogin(String code);
 
+    AuthStateEntity passwordLogin(String username, String password, String clientAddress);
+
+    AuthStateEntity register(String username, String password, String clientAddress);
+
+    void logout(String token);
+
     boolean checkToken(String token);
 
     String openid(String token);

@@ -3,5 +3,5 @@ spring:
     name: chatgpt-data-app
     import: "optional:file:.env[.properties],optional:file:${PAYMENT_CONFIG_FILE:.env.payment}[.properties],classpath:application-models.yml"
   profiles:
-#    active: dev
-    active: prod
+    active: dev
+#    active: prod
