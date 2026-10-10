@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.bugstack.chatgpt.data.infrastructure.dao.IAgentBillingDao">
+
+    <resultMap id="agentRunMap" type="cn.bugstack.chatgpt.data.infrastructure.dao.po.AgentRunBudgetPO">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="run_id" property="runId"/>
+        <result column="status" property="status"/>
+        <result column="budget_limit" property="budgetLimit"/>
+        <result column="reserved_amount" property="reservedAmount"/>
+        <result column="settled_amount" property="settledAmount"/>
+        <result column="review_required" property="reviewRequired"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <resultMap id="agentCallMap" type="cn.bugstack.chatgpt.data.infrastructure.dao.po.AgentCallChargePO">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="run_id" property="runId"/>
+        <result column="call_id" property="callId"/>
+        <result column="payload_hash" property="payloadHash"/>
+        <result column="purpose" property="purpose"/>
+        <result column="model" property="model"/>
+        <result column="input_price" property="inputPrice"/>
+        <result column="cached_input_price" property="cachedInputPrice"/>
+        <result column="output_price" property="outputPrice"/>
+        <result column="max_output_tokens" property="maxOutputTokens"/>
+        <result column="reserved_amount" property="reservedAmount"/>
+        <result column="settled_amount" property="settledAmount"/>
+        <result column="observed_amount" property="observedAmount"/>
+        <result column="observed_excess_amount" property="observedExcessAmount"/>
+        <result column="prompt_tokens" property="promptTokens"/>
+        <result column="completion_tokens" property="completionTokens"/>
+        <result column="cached_prompt_tokens" property="cachedPromptTokens"/>
+        <result column="status" property="status"/>
+        <result column="review_required" property="reviewRequired"/>
+        <result column="release_reason" property="releaseReason"/>
+        <result column="lease_until" property="leaseUntil"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insertRun" parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.AgentRunBudgetPO">
+        INSERT IGNORE INTO ai_run_budget(
+            user_id, run_id, status, budget_limit, reserved_amount, settled_amount,
+            review_required, create_time, update_time
+        ) VALUES(
+            #{userId}, #{runId}, #{status}, #{budgetLimit}, #{reservedAmount}, #{settledAmount},
+            #{reviewRequired}, now(), now()
+        )
+    </insert>
+
+    <select id="findRun" resultMap="agentRunMap">
+        SELECT id, user_id, run_id, status, budget_limit, reserved_amount, settled_amount,
+               review_required, create_time, update_time
+        FROM ai_run_budget
+        WHERE user_id = #{userId} AND run_id = #{runId}
+    </select>
+
+    <select id="findRunForUpdate" resultMap="agentRunMap">
+        SELECT id, user_id, run_id, status, budget_limit, reserved_amount, settled_amount,
+               review_required, create_time, update_time
+        FROM ai_run_budget
+        WHERE user_id = #{userId} AND run_id = #{runId}
+        FOR UPDATE
+    </select>
+
+    <update id="updateRun" parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.AgentRunBudgetPO">
+        UPDATE ai_run_budget
+        SET status = #{status}, reserved_amount = #{reservedAmount}, settled_amount = #{settledAmount},
+            review_required = #{reviewRequired}, update_time = now()
+        WHERE id = #{id}
+    </update>
+
+    <insert id="insertCall" parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.AgentCallChargePO">
+        INSERT INTO agent_call_charge(
+            user_id, run_id, call_id, payload_hash, purpose, model,
+            input_price, cached_input_price, output_price, max_output_tokens,
+            reserved_amount, settled_amount, observed_amount, observed_excess_amount,
+            status, review_required, lease_until, create_time, update_time
+        ) VALUES(
+            #{userId}, #{runId}, #{callId}, #{payloadHash}, #{purpose}, #{model},
+            #{inputPrice}, #{cachedInputPrice}, #{outputPrice}, #{maxOutputTokens},
+            #{reservedAmount}, #{settledAmount}, #{observedAmount}, #{observedExcessAmount},
+            #{status}, #{reviewRequired}, #{leaseUntil}, now(), now()
+        )
+    </insert>
+
+    <select id="findCall" resultMap="agentCallMap">
+        SELECT id, user_id, run_id, call_id, payload_hash, purpose, model,
+               input_price, cached_input_price, output_price, max_output_tokens,
+               reserved_amount, settled_amount, observed_amount, observed_excess_amount,
+               prompt_tokens, completion_tokens, cached_prompt_tokens, status,
+               review_required, release_reason, lease_until, create_time, update_time
+        FROM agent_call_charge
+        WHERE user_id = #{userId} AND call_id = #{callId}
+    </select>
+
+    <select id="findCallForUpdate" resultMap="agentCallMap">
+        SELECT id, user_id, run_id, call_id, payload_hash, purpose, model,
+               input_price, cached_input_price, output_price, max_output_tokens,
+               reserved_amount, settled_amount, observed_amount, observed_excess_amount,
+               prompt_tokens, completion_tokens, cached_prompt_tokens, status,
+               review_required, release_reason, lease_until, create_time, update_time
+        FROM agent_call_charge
+        WHERE user_id = #{userId} AND call_id = #{callId}
+        FOR UPDATE
+    </select>
+
+    <update id="updateCall" parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.AgentCallChargePO">
+        UPDATE agent_call_charge
+        SET status = #{status}, settled_amount = #{settledAmount}, observed_amount = #{observedAmount},
+            observed_excess_amount = #{observedExcessAmount}, prompt_tokens = #{promptTokens},
+            completion_tokens = #{completionTokens}, cached_prompt_tokens = #{cachedPromptTokens},
+            review_required = #{reviewRequired}, release_reason = #{releaseReason},
+            lease_until = #{leaseUntil}, update_time = now()
+        WHERE id = #{id}
+    </update>
+
+    <select id="findWalletAvailableForUpdate" resultType="java.math.BigDecimal">
+        SELECT available_amount
+        FROM account_wallet
+        WHERE openid = #{userId} AND currency = 'CNY'
+        FOR UPDATE
+    </select>
+
+    <update id="debitWallet">
+        UPDATE account_wallet w
+        LEFT JOIN user_account u ON u.openid = w.openid
+        SET w.available_amount = w.available_amount - #{amount}, w.update_time = now()
+        WHERE w.openid = #{userId} AND w.currency = 'CNY'
+          AND w.available_amount &gt;= #{amount}
+          AND (u.openid IS NULL OR u.status = 0)
+    </update>
+
+    <update id="refundWallet">
+        UPDATE account_wallet
+        SET available_amount = available_amount + #{amount}, update_time = now()
+        WHERE openid = #{userId} AND currency = 'CNY'
+    </update>
+
+    <select id="findStaleCalls" resultMap="agentCallMap">
+        SELECT id, user_id, run_id, call_id, payload_hash, purpose, model,
+               input_price, cached_input_price, output_price, max_output_tokens,
+               reserved_amount, settled_amount, observed_amount, observed_excess_amount,
+               prompt_tokens, completion_tokens, cached_prompt_tokens, status,
+               review_required, release_reason, lease_until, create_time, update_time
+        FROM agent_call_charge
+        WHERE status = 0 AND lease_until &lt; #{now}
+        ORDER BY lease_until ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

@@ -34,7 +34,7 @@ public class AuthService extends AbstractAuthService {
     @Override
     public AuthStateEntity passwordLogin(String username, String password, String clientAddress) {
         username = normalizeUsername(username);
-        if (!validCredentials(username, password)) return failure("0004", "账号或密码错误");
+        if (!validLoginCredentials(username, password)) return failure("0004", "账号或密码错误");
         if (!repository.acquireAuthPermit("login-ip:" + clientAddress, 60, 900)
                 || !repository.acquireAuthPermit("login-user:" + username, 15, 900)) {
             return failure("0006", "操作过于频繁，请稍后再试");
@@ -73,8 +73,12 @@ public class AuthService extends AbstractAuthService {
     }
 
     private static boolean validCredentials(String username, String password) {
+        return validLoginCredentials(username, password) && password.length() >= 8;
+    }
+
+    private static boolean validLoginCredentials(String username, String password) {
         return username.matches("[a-z0-9_]{4,32}") && password != null
-                && password.length() >= 8 && password.length() <= 64
+                && !password.isEmpty() && password.length() <= 64
                 && password.getBytes(StandardCharsets.UTF_8).length <= 72;
     }
 

@@ -113,7 +113,7 @@ public class PaymentOrderServiceTest {
     private CreateOrderAggregate order(OrderStatusVO status) {
         return CreateOrderAggregate.builder()
                 .openid("user-1")
-                .product(ProductEntity.builder().productId(1001).productName("sandbox-plan").quota(100).build())
+                .product(ProductEntity.builder().productId(1001).productName("sandbox-plan").build())
                 .order(OrderEntity.builder()
                         .orderId(ORDER_ID)
                         .orderTime(new Date())

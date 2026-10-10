@@ -16,7 +16,8 @@ public abstract class AbstractOrderService implements IOrderService {
         ProductEntity product = orderRepository.queryProduct(cart.getProductId());
         if (product == null || !product.isAvailable() || product.getPrice() == null
                 || product.getPrice().signum() <= 0
-                || (product.getCreditAmount() != null && product.getCreditAmount().signum() <= 0)) {
+                || product.getCreditAmount() == null
+                || product.getCreditAmount().signum() <= 0) {
             throw new IllegalArgumentException("Product unavailable");
         }
         product.applyRechargeFee();

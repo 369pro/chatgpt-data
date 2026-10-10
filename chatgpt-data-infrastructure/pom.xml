@@ -48,7 +48,7 @@
 
         <!-- big-market api -->
         <dependency>
-            <groupId>cn.bugstack</groupId>
+            <groupId>com.pro</groupId>
             <artifactId>big-market-api</artifactId>
         </dependency>
 

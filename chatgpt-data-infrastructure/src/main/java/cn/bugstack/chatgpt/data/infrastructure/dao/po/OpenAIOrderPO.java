@@ -27,9 +27,7 @@ public class OpenAIOrderPO {
     private Integer productId;
     /** 商品名称 */
     private String productName;
-    /** 商品额度 */
-    private Integer productQuota;
-    /** 钱包充值金额快照；为空表示历史额度订单 */
+    /** 钱包充值金额快照；为空表示历史订单，不能自动发货 */
     private BigDecimal productCreditAmount;
     /** Null fee snapshots identify orders placed before service fees were introduced. */
     private BigDecimal productFeeRate;

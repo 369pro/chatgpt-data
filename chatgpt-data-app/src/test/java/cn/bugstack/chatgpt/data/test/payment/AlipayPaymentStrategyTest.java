@@ -36,8 +36,25 @@ public class AlipayPaymentStrategyTest {
     public void setUp() {
         client = mock(AlipayClient.class);
         strategy = new AlipayPaymentStrategy(
-                true, "sandbox-app", "private-key", "public-key", "seller-id", "", "http://return");
+                true, "sandbox-app", "private-key", "public-key", "seller-id", "", "http://localhost:3002/payment/return");
         ReflectionTestUtils.setField(strategy, "client", client);
+    }
+
+    @Test
+    public void checkoutUsesMerchantReturnPageWithoutHash() throws Exception {
+        com.alipay.api.response.AlipayTradePagePayResponse response =
+                new com.alipay.api.response.AlipayTradePagePayResponse();
+        response.setBody("sandbox-checkout");
+        when(client.pageExecute(any(com.alipay.api.request.AlipayTradePagePayRequest.class),
+                org.mockito.ArgumentMatchers.eq("GET"))).thenReturn(response);
+
+        assertEquals("sandbox-checkout", strategy.create(ORDER_ID, "Wallet", AMOUNT, new Date()));
+        org.mockito.ArgumentCaptor<com.alipay.api.request.AlipayTradePagePayRequest> captor =
+                forClass(com.alipay.api.request.AlipayTradePagePayRequest.class);
+        verify(client).pageExecute(captor.capture(), org.mockito.ArgumentMatchers.eq("GET"));
+        assertEquals("http://localhost:3002/payment/return", captor.getValue().getReturnUrl());
+        assertEquals(ORDER_ID, ((com.alipay.api.domain.AlipayTradePagePayModel)
+                captor.getValue().getBizModel()).getOutTradeNo());
     }
 
     @Test

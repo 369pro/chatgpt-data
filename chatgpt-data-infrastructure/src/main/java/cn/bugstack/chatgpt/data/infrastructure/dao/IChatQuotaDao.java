@@ -16,8 +16,6 @@ public interface IChatQuotaDao {
 
     int insertReservation(ChatQuotaPO chatQuotaPO);
 
-    int decrementUserQuota(@Param("openid") String openid);
-
     int debitWallet(@Param("openid") String openid, @Param("amount") BigDecimal amount);
 
     int recordWalletCharge(@Param("openid") String openid, @Param("requestId") String requestId,
@@ -34,8 +32,6 @@ public interface IChatQuotaDao {
     int releaseReservation(@Param("openid") String openid, @Param("requestId") String requestId);
 
     int releaseReservationById(@Param("id") Long id);
-
-    int refundUserQuota(@Param("openid") String openid);
 
     List<ChatQuotaPO> findExpiredReservations(@Param("expiredBefore") Date expiredBefore,
                                                @Param("limit") int limit);

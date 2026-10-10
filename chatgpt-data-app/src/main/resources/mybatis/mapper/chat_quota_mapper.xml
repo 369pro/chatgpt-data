@@ -30,15 +30,6 @@
         )
     </insert>
 
-    <update id="decrementUserQuota" parameterType="java.lang.String">
-        UPDATE user_account
-        SET surplus_quota = surplus_quota - 1,
-            update_time = now()
-        WHERE openid = #{openid}
-          AND surplus_quota > 0
-          AND status = 0
-    </update>
-
     <update id="confirmReservation">
         UPDATE chat_quota_request
         SET status = 1,
@@ -50,10 +41,11 @@
     </update>
 
     <update id="debitWallet">
-        UPDATE account_wallet w INNER JOIN user_account u ON u.openid = w.openid
+        UPDATE account_wallet w LEFT JOIN user_account u ON u.openid = w.openid
         SET w.available_amount = w.available_amount - #{amount}, w.update_time = now()
         WHERE w.openid = #{openid} AND w.currency = 'CNY'
-          AND w.available_amount &gt;= #{amount} AND u.status = 0
+          AND w.available_amount &gt;= #{amount}
+          AND (u.openid IS NULL OR u.status = 0)
     </update>
 
     <update id="recordWalletCharge">
@@ -93,13 +85,6 @@
             update_time = now()
         WHERE id = #{id}
           AND status = 0
-    </update>
-
-    <update id="refundUserQuota" parameterType="java.lang.String">
-        UPDATE user_account
-        SET surplus_quota = surplus_quota + 1,
-            update_time = now()
-        WHERE openid = #{openid}
     </update>
 
     <select id="findExpiredReservations" resultMap="chatQuotaMap">

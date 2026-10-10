@@ -7,7 +7,6 @@
         <result column="product_id" property="productId"/>
         <result column="product_name" property="productName"/>
         <result column="product_desc" property="productDesc"/>
-        <result column="quota" property="quota"/>
         <result column="price" property="price"/>
         <result column="credit_amount" property="creditAmount"/>
         <result column="sort" property="sort"/>
@@ -17,13 +16,13 @@
     </resultMap>
 
     <select id="queryProductByProductId" parameterType="java.lang.Integer" resultMap="openAIProductMap">
-        SELECT product_id, product_name, product_desc, quota, price, credit_amount, is_enabled
+        SELECT product_id, product_name, product_desc, price, credit_amount, is_enabled
         FROM openai_product
         WHERE product_id = #{productId}
     </select>
 
     <select id="queryProductList" resultMap="openAIProductMap">
-        SELECT product_id, product_name, product_desc, quota, price, credit_amount
+        SELECT product_id, product_name, product_desc, price, credit_amount
         FROM openai_product
         WHERE is_enabled = 1
         ORDER BY sort

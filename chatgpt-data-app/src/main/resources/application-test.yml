@@ -1,6 +1,11 @@
 server:
   port: 8091
 
+payment:
+  events:
+    rocketmq:
+      enabled: false
+
 # 应用配置
 app:
   config:

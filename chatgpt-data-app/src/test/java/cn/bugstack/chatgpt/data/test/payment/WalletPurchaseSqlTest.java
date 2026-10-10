@@ -4,6 +4,7 @@ import cn.bugstack.chatgpt.data.domain.order.model.aggregates.CreateOrderAggrega
 import cn.bugstack.chatgpt.data.domain.order.model.entity.OrderEntity;
 import cn.bugstack.chatgpt.data.domain.order.model.entity.ProductEntity;
 import cn.bugstack.chatgpt.data.domain.order.model.entity.ShopCartEntity;
+import cn.bugstack.chatgpt.data.domain.order.model.entity.UnpaidOrderEntity;
 import cn.bugstack.chatgpt.data.domain.order.model.valobj.OrderStatusVO;
 import cn.bugstack.chatgpt.data.domain.order.model.valobj.PayTypeVO;
 import cn.bugstack.chatgpt.data.infrastructure.adapter.repository.OrderRepository;
@@ -12,6 +13,7 @@ import cn.bugstack.chatgpt.data.infrastructure.dao.IBalanceGrantDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IOpenAIOrderDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IOpenAIProductDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IUserAccountDao;
+import cn.bugstack.chatgpt.data.infrastructure.dao.IPaymentEventOutboxDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIOrderPO;
 import org.junit.After;
 import org.junit.Assume;
@@ -80,7 +82,7 @@ public class WalletPurchaseSqlTest {
         String openid = uniqueOpenid();
         String orderId = uniqueOrderId();
         try {
-            fixture.insertPaidOrder(openid, orderId, 19001, 0, GROSS_AMOUNT, NET_AMOUNT,
+            fixture.insertPaidOrder(openid, orderId, 19001, GROSS_AMOUNT, NET_AMOUNT,
                     FEE_RATE, FEE_AMOUNT);
 
             fixture.deliverConcurrently(orderId);
@@ -97,39 +99,38 @@ public class WalletPurchaseSqlTest {
                     PAYMENT_APP_ID, orderId));
             assertEquals(Integer.valueOf(1), fixture.queryInt(
                     "SELECT COUNT(*) FROM account_wallet WHERE openid = ?", openid));
+            assertEquals(Integer.valueOf(1), fixture.queryInt(
+                    "SELECT COUNT(*) FROM payment_event_outbox WHERE event_type = 'DELIVERED' AND order_id = ?",
+                    orderId));
             assertAmount(WALLET_AMOUNT, fixture.queryDecimal(
                     "SELECT available_amount FROM account_wallet WHERE openid = ?", openid));
             assertAmount(WALLET_AMOUNT, fixture.queryDecimal(
                     "SELECT total_amount FROM account_wallet WHERE openid = ?", openid));
-            assertEquals(Integer.valueOf(0), fixture.queryInt(
-                    "SELECT total_quota FROM user_account WHERE openid = ?", openid));
-            assertEquals(Integer.valueOf(0), fixture.queryInt(
-                    "SELECT surplus_quota FROM user_account WHERE openid = ?", openid));
         } finally {
             fixture.deleteFixture(openid, orderId, null);
         }
     }
 
     @Test
-    public void legacyPaidOrderDeliversQuotaWithoutWalletGrant() {
+    public void historicalPaidOrderWithNullCreditSnapshotStaysPendingForManualHandling() {
         String openid = uniqueOpenid();
         String orderId = uniqueOrderId();
         try {
-            fixture.insertPaidOrder(openid, orderId, 19002, 7, new BigDecimal("7.00"), null);
+            fixture.insertPaidOrder(openid, orderId, 19002, new BigDecimal("7.00"), null);
 
             fixture.deliver(orderId);
 
-            assertEquals(Integer.valueOf(2), fixture.queryInt(
+            assertEquals(Integer.valueOf(1), fixture.queryInt(
                     "SELECT order_status FROM openai_order WHERE order_id = ?", orderId));
-            assertEquals(Integer.valueOf(7), fixture.queryInt(
-                    "SELECT total_quota FROM user_account WHERE openid = ?", openid));
-            assertEquals(Integer.valueOf(7), fixture.queryInt(
-                    "SELECT surplus_quota FROM user_account WHERE openid = ?", openid));
+            assertEquals(Integer.valueOf(0), fixture.queryInt(
+                    "SELECT COUNT(*) FROM user_account WHERE openid = ?", openid));
             assertEquals(Integer.valueOf(0), fixture.queryInt(
                     "SELECT COUNT(*) FROM account_wallet WHERE openid = ?", openid));
             assertEquals(Integer.valueOf(0), fixture.queryInt(
                     "SELECT COUNT(*) FROM balance_grant WHERE app_id = ? AND request_id = ?",
                     PAYMENT_APP_ID, orderId));
+            assertEquals(Integer.valueOf(0), fixture.queryInt(
+                    "SELECT COUNT(*) FROM payment_event_outbox WHERE order_id = ?", orderId));
         } finally {
             fixture.deleteFixture(openid, orderId, null);
         }
@@ -141,7 +142,7 @@ public class WalletPurchaseSqlTest {
         String orderId = uniqueOrderId();
         try {
             fixture.insertOverflowWallet(openid);
-            fixture.insertPaidOrder(openid, orderId, 19003, 0, GROSS_AMOUNT, NET_AMOUNT,
+            fixture.insertPaidOrder(openid, orderId, 19003, GROSS_AMOUNT, NET_AMOUNT,
                     FEE_RATE, FEE_AMOUNT);
 
             RuntimeException failure = fixture.deliverWithStrictDecimalFailure(orderId);
@@ -169,7 +170,7 @@ public class WalletPurchaseSqlTest {
         int productId = PRODUCT_SEQUENCE.getAndIncrement();
         try {
             fixture.insertProduct(productId, GROSS_AMOUNT, NET_AMOUNT);
-            fixture.insertPaidOrder(openid, orderId, productId, 0, GROSS_AMOUNT, NET_AMOUNT,
+            fixture.insertPaidOrder(openid, orderId, productId, GROSS_AMOUNT, NET_AMOUNT,
                     FEE_RATE, FEE_AMOUNT);
             fixture.updateProduct(productId, new BigDecimal("99.90"), new BigDecimal("89.91"));
 
@@ -199,7 +200,6 @@ public class WalletPurchaseSqlTest {
                     .productId(productId)
                     .productName("wallet-sql-save")
                     .productDesc("Wallet SQL fixture")
-                    .quota(0)
                     .price(GROSS_AMOUNT)
                     .creditAmount(GROSS_AMOUNT)
                     .build();
@@ -234,6 +234,13 @@ public class WalletPurchaseSqlTest {
             assertEquals(Integer.valueOf(0), fixture.queryInt(
                     "SELECT order_status FROM openai_order WHERE order_id = ?", orderId));
             assertTrue(fixture.markPaid(orderId, "paid-" + orderId, GROSS_AMOUNT));
+            assertEquals(Integer.valueOf(1), fixture.queryInt(
+                    "SELECT COUNT(*) FROM payment_event_outbox WHERE event_type = 'PAID' AND order_id = ?",
+                    orderId));
+            assertFalse(fixture.markPaid(orderId, "paid-again-" + orderId, GROSS_AMOUNT));
+            assertEquals(Integer.valueOf(1), fixture.queryInt(
+                    "SELECT COUNT(*) FROM payment_event_outbox WHERE event_type = 'PAID' AND order_id = ?",
+                    orderId));
 
             fixture.deliverConcurrently(orderId);
             fixture.deliver(orderId);
@@ -255,7 +262,7 @@ public class WalletPurchaseSqlTest {
         String openid = uniqueOpenid();
         String orderId = uniqueOrderId();
         try {
-            fixture.insertPaidOrder(openid, orderId, 19004, 0, GROSS_AMOUNT, GROSS_AMOUNT,
+            fixture.insertPaidOrder(openid, orderId, 19004, GROSS_AMOUNT, GROSS_AMOUNT,
                     null, null);
 
             fixture.deliver(orderId);
@@ -277,7 +284,7 @@ public class WalletPurchaseSqlTest {
         int productId = PRODUCT_SEQUENCE.getAndIncrement();
         try {
             fixture.insertProduct(productId, GROSS_AMOUNT, NET_AMOUNT);
-            fixture.insertUnpaidOrder(openid, orderId, productId, 0, GROSS_AMOUNT, GROSS_AMOUNT,
+            fixture.insertUnpaidOrder(openid, orderId, productId, GROSS_AMOUNT, GROSS_AMOUNT,
                     null, null);
 
             ShopCartEntity cart = ShopCartEntity.builder()
@@ -288,6 +295,38 @@ public class WalletPurchaseSqlTest {
             assertNull(fixture.repository.queryUnpaidOrder(cart));
         } finally {
             fixture.deleteFixture(openid, orderId, productId);
+        }
+    }
+
+    @Test
+    public void legacyUnpaidOrderIsIgnoredAndWalletUnpaidOrderIsReusable() {
+        String openid = uniqueOpenid();
+        String legacyOrderId = uniqueOrderId();
+        String walletOrderId = uniqueOrderId();
+        int productId = PRODUCT_SEQUENCE.getAndIncrement();
+        try {
+            fixture.insertProduct(productId, GROSS_AMOUNT, null);
+            fixture.insertUnpaidOrder(openid, legacyOrderId, productId, GROSS_AMOUNT, null,
+                    null, null);
+
+            ShopCartEntity legacyCart = ShopCartEntity.builder()
+                    .openid(openid)
+                    .productId(productId)
+                    .payType(PayTypeVO.ALIPAY_SANDBOX)
+                    .build();
+            assertNull(fixture.repository.queryUnpaidOrder(legacyCart));
+
+            fixture.updateProduct(productId, GROSS_AMOUNT, NET_AMOUNT);
+            fixture.insertUnpaidOrder(openid, walletOrderId, productId, GROSS_AMOUNT, NET_AMOUNT,
+                    FEE_RATE, FEE_AMOUNT);
+
+            UnpaidOrderEntity walletOrder = fixture.repository.queryUnpaidOrder(legacyCart);
+            assertNotNull(walletOrder);
+            assertEquals(walletOrderId, walletOrder.getOrderId());
+            assertAmount(GROSS_AMOUNT, walletOrder.getTotalAmount());
+        } finally {
+            fixture.deleteFixture(openid, legacyOrderId, null);
+            fixture.deleteFixture(openid, walletOrderId, productId);
         }
     }
 
@@ -338,41 +377,64 @@ public class WalletPurchaseSqlTest {
 
     private static final class SqlFixture implements AutoCloseable {
         private final JdbcTemplate jdbcTemplate;
+        private final JdbcTemplate adminJdbcTemplate;
         private final TransactionTemplate transactionTemplate;
         private final OrderRepository repository;
         private final IOpenAIOrderDao orderDao;
+        private final String schemaName;
 
         private SqlFixture(JdbcTemplate jdbcTemplate,
+                           JdbcTemplate adminJdbcTemplate,
                            TransactionTemplate transactionTemplate,
                            OrderRepository repository,
-                           IOpenAIOrderDao orderDao) {
+                           IOpenAIOrderDao orderDao,
+                           String schemaName) {
             this.jdbcTemplate = jdbcTemplate;
+            this.adminJdbcTemplate = adminJdbcTemplate;
             this.transactionTemplate = transactionTemplate;
             this.repository = repository;
             this.orderDao = orderDao;
+            this.schemaName = schemaName;
         }
 
         private static SqlFixture open() throws Exception {
-            DriverManagerDataSource dataSource = new DriverManagerDataSource();
-            dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
-            dataSource.setUrl(setting(
+            String configuredUrl = setting(
                     "chat.quota.jdbc.url",
                     "CHAT_QUOTA_JDBC_URL",
                     setting("mysql.url", "MYSQL_URL",
                             "jdbc:mysql://127.0.0.1:3306/openai?useUnicode=true"
                                     + "&characterEncoding=utf8&serverTimezone=Asia/Shanghai"
                                     + "&useSSL=false&allowPublicKeyRetrieval=true")
-            ));
-            dataSource.setUsername(setting(
+            );
+            String username = setting(
                     "chat.quota.jdbc.user",
                     "CHAT_QUOTA_DB_USER",
                     setting("mysql.username", "MYSQL_USERNAME", "root")
-            ));
-            dataSource.setPassword(setting(
+            );
+            String password = setting(
                     "chat.quota.jdbc.password",
                     "CHAT_QUOTA_DB_PASSWORD",
                     setting("mysql.password", "MYSQL_PASSWORD", "")
-            ));
+            );
+
+            String schemaName = "chatgpt_payment_it_"
+                    + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+            DriverManagerDataSource adminDataSource = new DriverManagerDataSource();
+            adminDataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+            adminDataSource.setUrl(withDatabase(configuredUrl, "mysql"));
+            adminDataSource.setUsername(username);
+            adminDataSource.setPassword(password);
+            JdbcTemplate adminJdbcTemplate = new JdbcTemplate(adminDataSource);
+            adminJdbcTemplate.execute("CREATE DATABASE `" + schemaName
+                    + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+            DriverManagerDataSource dataSource = new DriverManagerDataSource();
+            dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+            dataSource.setUrl(withDatabase(configuredUrl, schemaName));
+            dataSource.setUsername(username);
+            dataSource.setPassword(password);
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+            createSchema(jdbcTemplate);
 
             PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
             SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
@@ -382,7 +444,8 @@ public class WalletPurchaseSqlTest {
                     resolver.getResource("classpath:/mybatis/mapper/openai_product_mapper.xml"),
                     resolver.getResource("classpath:/mybatis/mapper/user_account_mapper.xml"),
                     resolver.getResource("classpath:/mybatis/mapper/account_wallet_mapper.xml"),
-                    resolver.getResource("classpath:/mybatis/mapper/account_balance_mapper.xml")
+                    resolver.getResource("classpath:/mybatis/mapper/account_balance_mapper.xml"),
+                    resolver.getResource("classpath:/mybatis/mapper/payment_event_outbox_mapper.xml")
             });
             factoryBean.afterPropertiesSet();
 
@@ -392,6 +455,7 @@ public class WalletPurchaseSqlTest {
             IUserAccountDao userAccountDao = sqlSession.getMapper(IUserAccountDao.class);
             IAccountWalletDao accountWalletDao = sqlSession.getMapper(IAccountWalletDao.class);
             IBalanceGrantDao balanceGrantDao = sqlSession.getMapper(IBalanceGrantDao.class);
+            IPaymentEventOutboxDao paymentEventOutboxDao = sqlSession.getMapper(IPaymentEventOutboxDao.class);
 
             OrderRepository repository = new OrderRepository();
             setField(repository, "openAIOrderDao", orderDao);
@@ -399,30 +463,128 @@ public class WalletPurchaseSqlTest {
             setField(repository, "userAccountDao", userAccountDao);
             setField(repository, "accountWalletDao", accountWalletDao);
             setField(repository, "balanceGrantDao", balanceGrantDao);
+            setField(repository, "paymentEventOutboxDao", paymentEventOutboxDao);
             setField(repository, "modelTypes", "wallet-sql-test-model");
 
             DataSourceTransactionManager transactionManager = new DataSourceTransactionManager(dataSource);
             return new SqlFixture(
-                    new JdbcTemplate(dataSource),
+                    jdbcTemplate,
+                    adminJdbcTemplate,
                     new TransactionTemplate(transactionManager),
                     repository,
-                    orderDao
+                    orderDao,
+                    schemaName
             );
         }
 
-        private void insertPaidOrder(String openid,
-                                     String orderId,
-                                     int productId,
-                                     int productQuota,
-                                     BigDecimal price,
-                                     BigDecimal creditAmount) {
-            insertPaidOrder(openid, orderId, productId, productQuota, price, creditAmount, null, null);
+        private static void createSchema(JdbcTemplate jdbcTemplate) {
+            jdbcTemplate.execute("""
+                    CREATE TABLE openai_order (
+                      id BIGINT NOT NULL AUTO_INCREMENT,
+                      openid VARCHAR(128) NOT NULL,
+                      product_id INT NOT NULL,
+                      product_name VARCHAR(32) NOT NULL,
+                      product_credit_amount DECIMAL(20,8) NULL,
+                      product_fee_rate DECIMAL(5,4) NULL,
+                      product_fee_amount DECIMAL(20,2) NULL,
+                      order_id VARCHAR(12) NOT NULL,
+                      order_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      order_status TINYINT NOT NULL,
+                      total_amount DECIMAL(10,2) NOT NULL,
+                      pay_type TINYINT NOT NULL DEFAULT 0,
+                      pay_url TEXT NULL,
+                      pay_amount DECIMAL(10,2) NULL,
+                      transaction_id VARCHAR(32) NULL,
+                      pay_status TINYINT NULL,
+                      pay_time DATETIME NULL,
+                      create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                      PRIMARY KEY (id), UNIQUE KEY uq_order_id (order_id),
+                      KEY idx_order_status_pay_status_order_time (order_time, order_status, pay_status)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE TABLE openai_product (
+                      id BIGINT NOT NULL AUTO_INCREMENT,
+                      product_id INT NOT NULL,
+                      product_name VARCHAR(32) NOT NULL,
+                      product_desc VARCHAR(128) NOT NULL,
+                      product_model_types VARCHAR(128) NULL,
+                      price DECIMAL(10,2) NOT NULL,
+                      credit_amount DECIMAL(20,8) NULL,
+                      sort INT NOT NULL,
+                      is_enabled TINYINT NOT NULL DEFAULT 1,
+                      create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                      PRIMARY KEY (id), KEY idx_product_id_enabled (product_id, is_enabled)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE TABLE user_account (
+                      id BIGINT NOT NULL AUTO_INCREMENT,
+                      openid VARCHAR(64) NOT NULL,
+                      model_types VARCHAR(128) NOT NULL,
+                      status TINYINT NOT NULL DEFAULT 0,
+                      create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                      PRIMARY KEY (id), UNIQUE KEY uq_openid (openid)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE TABLE account_wallet (
+                      id BIGINT NOT NULL AUTO_INCREMENT,
+                      openid VARCHAR(64) NOT NULL,
+                      currency CHAR(3) NOT NULL DEFAULT 'CNY',
+                      available_amount DECIMAL(20,8) NOT NULL DEFAULT 0,
+                      total_amount DECIMAL(20,8) NOT NULL DEFAULT 0,
+                      create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                      PRIMARY KEY (id), UNIQUE KEY uq_account_wallet_openid (openid)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE TABLE balance_grant (
+                      id BIGINT NOT NULL AUTO_INCREMENT,
+                      app_id VARCHAR(64) NOT NULL,
+                      request_id VARCHAR(160) NOT NULL,
+                      openid VARCHAR(64) NOT NULL,
+                      amount DECIMAL(20,8) NOT NULL,
+                      source VARCHAR(64) NOT NULL,
+                      create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      PRIMARY KEY (id), UNIQUE KEY uq_balance_grant_app_request (app_id, request_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE TABLE payment_event_outbox (
+                      id BIGINT NOT NULL AUTO_INCREMENT,
+                      event_type VARCHAR(32) NOT NULL,
+                      order_id VARCHAR(64) NOT NULL,
+                      status TINYINT NOT NULL DEFAULT 0,
+                      send_attempts INT NOT NULL DEFAULT 0,
+                      consume_attempts INT NOT NULL DEFAULT 0,
+                      next_attempt_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+                      sent_at DATETIME NULL,
+                      done_at DATETIME NULL,
+                      last_error VARCHAR(512) NULL,
+                      create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                      PRIMARY KEY (id), UNIQUE KEY uk_payment_event_type_order (event_type, order_id),
+                      KEY idx_payment_event_ready (status, next_attempt_at)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """);
         }
 
         private void insertPaidOrder(String openid,
                                      String orderId,
                                      int productId,
-                                     int productQuota,
+                                     BigDecimal price,
+                                     BigDecimal creditAmount) {
+            insertPaidOrder(openid, orderId, productId, price, creditAmount, null, null);
+        }
+
+        private void insertPaidOrder(String openid,
+                                     String orderId,
+                                     int productId,
                                      BigDecimal price,
                                      BigDecimal creditAmount,
                                      BigDecimal productFeeRate,
@@ -431,7 +593,6 @@ public class WalletPurchaseSqlTest {
                     .openid(openid)
                     .productId(productId)
                     .productName("wallet-it")
-                    .productQuota(productQuota)
                     .productCreditAmount(creditAmount)
                     .productFeeRate(productFeeRate)
                     .productFeeAmount(productFeeAmount)
@@ -451,7 +612,6 @@ public class WalletPurchaseSqlTest {
         private void insertUnpaidOrder(String openid,
                                        String orderId,
                                        int productId,
-                                       int productQuota,
                                        BigDecimal price,
                                        BigDecimal creditAmount,
                                        BigDecimal productFeeRate,
@@ -460,7 +620,6 @@ public class WalletPurchaseSqlTest {
                     .openid(openid)
                     .productId(productId)
                     .productName("wallet-it")
-                    .productQuota(productQuota)
                     .productCreditAmount(creditAmount)
                     .productFeeRate(productFeeRate)
                     .productFeeAmount(productFeeAmount)
@@ -482,10 +641,10 @@ public class WalletPurchaseSqlTest {
                 jdbcTemplate.update(
                         "INSERT INTO openai_product "
                                 + "(product_id, product_name, product_desc, product_model_types, "
-                                + "quota, price, credit_amount, sort, is_enabled) "
-                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                + "price, credit_amount, sort, is_enabled) "
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         productId, "Wallet SQL Test", "Wallet SQL fixture", "wallet-sql-test-model",
-                        0, price, creditAmount, 999, 1
+                        price, creditAmount, 999, 1
                 );
                 return null;
             });
@@ -588,6 +747,7 @@ public class WalletPurchaseSqlTest {
                         "DELETE FROM balance_grant WHERE app_id = ? AND request_id = ?",
                         PAYMENT_APP_ID, orderId
                 );
+                jdbcTemplate.update("DELETE FROM payment_event_outbox WHERE order_id = ?", orderId);
                 jdbcTemplate.update("DELETE FROM openai_order WHERE order_id = ?", orderId);
                 jdbcTemplate.update("DELETE FROM account_wallet WHERE openid = ?", openid);
                 jdbcTemplate.update("DELETE FROM user_account WHERE openid = ?", openid);
@@ -607,9 +767,21 @@ public class WalletPurchaseSqlTest {
                     : environmentValue;
         }
 
+        private static String withDatabase(String jdbcUrl, String database) {
+            int queryStart = jdbcUrl.indexOf('?');
+            String query = queryStart < 0 ? "" : jdbcUrl.substring(queryStart);
+            String base = queryStart < 0 ? jdbcUrl : jdbcUrl.substring(0, queryStart);
+            int slash = base.lastIndexOf('/');
+            if (slash < 0) {
+                throw new IllegalArgumentException("JDBC URL must contain a database path");
+            }
+            return base.substring(0, slash + 1) + database + query;
+        }
+
         @Override
         public void close() {
-            // DriverManagerDataSource owns no pool or closeable resource.
+            // The test owns this schema and drops it after every test class.
+            adminJdbcTemplate.execute("DROP DATABASE IF EXISTS `" + schemaName + "`");
         }
     }
 }

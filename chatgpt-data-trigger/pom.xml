@@ -16,6 +16,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- JDK HttpURLConnection cannot issue PATCH; the public Agent bridge
+             must support the full browser method set. -->
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+        </dependency>
         <!-- 监控；actuator-上报、prometheus-采集、grafana-展示 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -54,7 +54,6 @@ CREATE TABLE `openai_order` (
 
 LOCK TABLES `openai_order` WRITE;
 /*!40000 ALTER TABLE `openai_order` DISABLE KEYS */;
-
 /*!40000 ALTER TABLE `openai_order` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -115,7 +114,6 @@ CREATE TABLE `user_account` (
 
 LOCK TABLES `user_account` WRITE;
 /*!40000 ALTER TABLE `user_account` DISABLE KEYS */;
-
 /*!40000 ALTER TABLE `user_account` ENABLE KEYS */;
 UNLOCK TABLES;
 

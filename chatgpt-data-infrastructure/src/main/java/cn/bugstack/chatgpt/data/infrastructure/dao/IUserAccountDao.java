@@ -11,14 +11,8 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface IUserAccountDao {
 
-    int subAccountQuota(String openid);
-
     UserAccountPO queryUserAccount(String openid);
 
     void insert(UserAccountPO userAccountPOReq);
-
-    int addAccountQuota(UserAccountPO userAccountPOReq);
-
-    int addOrCreateAccountQuota(UserAccountPO userAccountPOReq);
 
 }

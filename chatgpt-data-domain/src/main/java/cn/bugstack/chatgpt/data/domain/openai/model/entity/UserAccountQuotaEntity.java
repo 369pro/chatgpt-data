@@ -12,7 +12,7 @@ import java.util.List;
 
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
- * @description 用户账户额度实体对象
+ * @description 用户账户访问实体对象
  * @create 2023-10-03 16:49
  */
 @Data
@@ -25,14 +25,6 @@ public class UserAccountQuotaEntity {
      * 用户ID
      */
     private String openid;
-    /**
-     * 总量额度
-     */
-    private Integer totalQuota;
-    /**
-     * 剩余额度
-     */
-    private Integer surplusQuota;
     /**
      * 账户状态
      */

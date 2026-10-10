@@ -4,7 +4,6 @@ import cn.bugstack.chatgpt.data.domain.order.model.entity.PayOrderEntity;
 import cn.bugstack.chatgpt.data.domain.order.model.entity.ShopCartEntity;
 import cn.bugstack.chatgpt.data.domain.order.service.IOrderService;
 import com.alibaba.fastjson2.JSON;
-import com.google.common.eventbus.EventBus;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -14,7 +13,6 @@ import org.springframework.test.context.junit4.SpringRunner;
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.Date;
-import java.util.concurrent.CountDownLatch;
 
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
@@ -29,9 +27,6 @@ public class OrderServiceTest {
     @Resource
     private IOrderService orderService;
 
-    @Resource
-    private EventBus eventBus;
-
     @Test
     public void test_createOrder() {
         ShopCartEntity shopCartEntity = ShopCartEntity.builder()
@@ -45,13 +40,6 @@ public class OrderServiceTest {
     @Test
     public void test_pay_success() {
         orderService.changeOrderPaySuccess("515019067766", "515019067766", BigDecimal.TEN, new Date());
-    }
-
-    @Test
-    public void test_mq() throws InterruptedException {
-        eventBus.post("515019067766");
-
-        new CountDownLatch(1).await();
     }
 
 }

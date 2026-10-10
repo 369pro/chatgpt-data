@@ -83,6 +83,15 @@ public class PasswordAuthTest {
     }
 
     @Test
+    public void resetShortPasswordCanLoginButCannotRegister() {
+        accounts.put("deepseek_local_1001", new AccountCredentialEntity("deepseek_local_1001",
+                "local-reset-user", new BCryptPasswordEncoder(12).encode("123456")));
+        assertEquals("0000", service.passwordLogin("deepseek_local_1001", "123456", "127.0.0.1").getCode());
+        assertEquals("0004", service.passwordLogin("deepseek_local_1001", "654321", "127.0.0.1").getCode());
+        assertEquals("0004", service.register("new_user", "123456", "127.0.0.1").getCode());
+    }
+
+    @Test
     public void logoutRevokesCachedToken() {
         String token = service.register("demo_user", "A-strong-password!", "127.0.0.1").getToken();
         service.logout(token);

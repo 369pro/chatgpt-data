@@ -7,7 +7,6 @@
         <result column="openid" property="openid"/>
         <result column="product_id" property="productId"/>
         <result column="product_name" property="productName"/>
-        <result column="product_quota" property="productQuota"/>
         <result column="product_credit_amount" property="productCreditAmount"/>
         <result column="product_fee_rate" property="productFeeRate"/>
         <result column="product_fee_amount" property="productFeeAmount"/>
@@ -27,11 +26,11 @@
 
     <insert id="insert" parameterType="cn.bugstack.chatgpt.data.infrastructure.dao.po.OpenAIOrderPO">
         INSERT INTO openai_order(
-        openid, product_id, product_name, product_quota, product_credit_amount, product_fee_rate, product_fee_amount, order_id,
+        openid, product_id, product_name, product_credit_amount, product_fee_rate, product_fee_amount, order_id,
         order_time, order_status, total_amount, pay_type, pay_status,
         pay_time, create_time, update_time)
         VALUES(
-        #{openid}, #{productId}, #{productName}, #{productQuota}, #{productCreditAmount}, #{productFeeRate}, #{productFeeAmount}, #{orderId},
+        #{openid}, #{productId}, #{productName}, #{productCreditAmount}, #{productFeeRate}, #{productFeeAmount}, #{orderId},
         #{orderTime}, #{orderStatus}, #{totalAmount}, #{payType}, #{payStatus},
         #{payTime}, now(), now()
         )
@@ -43,8 +42,8 @@
         FROM openai_order
         WHERE openid = #{openid} AND product_id = #{productId} AND order_status = 0
         AND pay_type = #{payType} AND pay_status = 0
-        AND (product_credit_amount = #{productCreditAmount}
-             OR (product_credit_amount IS NULL AND #{productCreditAmount} IS NULL))
+        AND product_credit_amount IS NOT NULL
+        AND product_credit_amount = #{productCreditAmount}
         AND product_fee_rate &lt;=> #{productFeeRate}
         AND product_fee_amount &lt;=> #{productFeeAmount}
         AND total_amount = #{totalAmount}
@@ -73,7 +72,7 @@
     </update>
 
     <select id="queryOrder" parameterType="java.lang.String" resultMap="userAccountMap">
-        SELECT openid, product_id, product_name, product_quota, product_credit_amount, product_fee_rate, product_fee_amount, order_id,
+        SELECT openid, product_id, product_name, product_credit_amount, product_fee_rate, product_fee_amount, order_id,
         order_time, order_status, total_amount, pay_type, pay_status,
         pay_time
         FROM openai_order

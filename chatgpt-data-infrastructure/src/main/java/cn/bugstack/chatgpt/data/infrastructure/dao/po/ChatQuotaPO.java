@@ -26,7 +26,7 @@ public class ChatQuotaPO {
     private String openid;
     private String requestId;
     private Integer status;
-    /** Null identifies a legacy one-conversation entitlement. */
+    /** Null identifies a historical count reservation; it is retired without refund. */
     private BigDecimal chargeAmount;
     private String model;
     private BigDecimal inputPrice;

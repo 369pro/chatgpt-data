@@ -5,3 +5,28 @@ spring:
   profiles:
     active: dev
 #    active: prod
+
+agent:
+  service:
+    url: ${AGENT_SERVICE_URL:http://agent-service:8093}
+  proxy:
+    connect-timeout-ms: ${AGENT_PROXY_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${AGENT_PROXY_READ_TIMEOUT_MS:120000}
+  billing:
+    max-budget: ${AGENT_MAX_BUDGET:100.00000000}
+    lease-minutes: ${AGENT_CALL_LEASE_MINUTES:5}
+
+# Payment events are persisted locally in the outbox even when MQ is disabled.
+# Production enables the native RocketMQ producer/consumer through its profile
+# or PAYMENT_EVENTS_ROCKETMQ_ENABLED=true.
+payment:
+  events:
+    rocketmq:
+      enabled: ${PAYMENT_EVENTS_ROCKETMQ_ENABLED:false}
+      namesrv-addr: ${ROCKETMQ_NAMESRV_ADDR:rocketmq-namesrv:9876}
+      topic: ${PAYMENT_EVENTS_ROCKETMQ_TOPIC:payment_lifecycle}
+      producer-group: ${PAYMENT_EVENTS_ROCKETMQ_PRODUCER_GROUP:chatgpt-payment-outbox}
+      consumer-group: ${PAYMENT_EVENTS_ROCKETMQ_CONSUMER_GROUP:chatgpt-payment-lifecycle}
+      confirmation-window-seconds: ${PAYMENT_EVENTS_ROCKETMQ_CONFIRMATION_WINDOW_SECONDS:60}
+      scan-fixed-delay-ms: ${PAYMENT_EVENTS_ROCKETMQ_SCAN_FIXED_DELAY_MS:5000}
+      batch-size: ${PAYMENT_EVENTS_ROCKETMQ_BATCH_SIZE:100}

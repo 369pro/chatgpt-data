@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -46,7 +47,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Tests wallet authorization and token usage settlement while keeping the
- * historical one-unit quota path covered by OpenAiRepositoryTest.
+ * retired legacy ledger rows are covered by OpenAiRepositoryTest.
  */
 public class TokenBillingRepositoryTest {
 
@@ -68,23 +69,24 @@ public class TokenBillingRepositoryTest {
     }
 
     @Test
-    public void legacyEntitlementIsConsumedBeforeWalletAuthorization() {
+    public void walletAuthorizationDoesNotTouchRetiredConversationCounts() {
         ChatBillingQuote quote = quote("0.01000000");
         when(chatQuotaDao.insertReservation(any(ChatQuotaPO.class))).thenReturn(1);
-        when(chatQuotaDao.decrementUserQuota("user-1")).thenReturn(1);
+        when(chatQuotaDao.debitWallet("user-1", quote.getReservedAmount())).thenReturn(1);
+        when(chatQuotaDao.recordWalletCharge("user-1", "request-1", quote.getReservedAmount()))
+                .thenReturn(1);
 
         assertTrue(repository.reserveChatQuota("user-1", "request-1", quote));
 
-        verify(chatQuotaDao).decrementUserQuota("user-1");
-        verify(chatQuotaDao, never()).debitWallet(anyString(), any(BigDecimal.class));
-        verify(chatQuotaDao, never()).recordWalletCharge(anyString(), anyString(), any(BigDecimal.class));
+        verify(chatQuotaDao).debitWallet("user-1", quote.getReservedAmount());
+        verify(chatQuotaDao).recordWalletCharge("user-1", "request-1", quote.getReservedAmount());
+        assertEquals(1, transactionManager.commitCount.get());
     }
 
     @Test
-    public void tokenReservationPreauthorizesWalletAndSnapshotsRatesAfterLegacyMiss() {
+    public void tokenReservationPreauthorizesWalletAndSnapshotsRates() {
         ChatBillingQuote quote = quote("0.01000000");
         when(chatQuotaDao.insertReservation(any(ChatQuotaPO.class))).thenReturn(1);
-        when(chatQuotaDao.decrementUserQuota("user-1")).thenReturn(0);
         when(chatQuotaDao.debitWallet("user-1", quote.getReservedAmount())).thenReturn(1);
         when(chatQuotaDao.recordWalletCharge("user-1", "request-1", quote.getReservedAmount()))
                 .thenReturn(1);
@@ -107,17 +109,31 @@ public class TokenBillingRepositoryTest {
     public void tokenReservationRollsBackWhenWalletCannotCoverAuthorization() {
         ChatBillingQuote quote = quote("0.01000000");
         when(chatQuotaDao.insertReservation(any(ChatQuotaPO.class))).thenReturn(1);
-        when(chatQuotaDao.decrementUserQuota("user-1")).thenReturn(0);
         when(chatQuotaDao.debitWallet("user-1", quote.getReservedAmount())).thenReturn(0);
 
         assertFalse(repository.reserveChatQuota("user-1", "request-1", quote));
 
         verify(chatQuotaDao).insertReservation(any(ChatQuotaPO.class));
-        verify(chatQuotaDao).decrementUserQuota("user-1");
         verify(chatQuotaDao).debitWallet("user-1", quote.getReservedAmount());
         verify(chatQuotaDao, never()).recordWalletCharge(anyString(), anyString(), any(BigDecimal.class));
         assertEquals(1, transactionManager.rollbackCount.get());
         assertEquals(0, transactionManager.commitCount.get());
+    }
+
+    @Test
+    public void nullQuoteIsRejectedBeforeAnyPersistence() {
+        try {
+            repository.reserveChatQuota("user-1", "request-1", null);
+            fail("Expected a billing quote to be required");
+        } catch (IllegalArgumentException e) {
+            assertEquals("Token billing quote is required", e.getMessage());
+        }
+
+        verify(chatQuotaDao, never()).insertReservation(any(ChatQuotaPO.class));
+        verify(chatQuotaDao, never()).debitWallet(anyString(), any(BigDecimal.class));
+        verify(chatQuotaDao, never()).recordWalletCharge(anyString(), anyString(), any(BigDecimal.class));
+        assertEquals(0, transactionManager.commitCount.get());
+        assertEquals(0, transactionManager.rollbackCount.get());
     }
 
     @Test
@@ -208,7 +224,6 @@ public class TokenBillingRepositoryTest {
         verify(chatQuotaDao).releaseReservation("user-1", "request-1");
         verify(chatQuotaDao).queryReservation("user-1", "request-1");
         verify(chatQuotaDao).refundWallet("user-1", new BigDecimal("0.01000000"));
-        verify(chatQuotaDao, never()).refundUserQuota(anyString());
     }
 
     @Test
@@ -237,7 +252,7 @@ public class TokenBillingRepositoryTest {
             String openid = uniqueValue("user");
             String requestId = uniqueValue("request");
             try {
-                fixture.insertAccount(openid, 0, 0);
+                fixture.insertAccount(openid);
                 fixture.insertWallet(openid, "0.02000000");
                 ChatBillingQuote quote = quote("0.01000000");
 
@@ -284,7 +299,7 @@ public class TokenBillingRepositoryTest {
             String requestId = uniqueValue("request");
             ExecutorService executor = Executors.newFixedThreadPool(2);
             try {
-                fixture.insertAccount(openid, 0, 0);
+                fixture.insertAccount(openid);
                 fixture.insertWallet(openid, "0.01000000");
                 ChatBillingQuote quote = quote("0.00200000");
                 CountDownLatch ready = new CountDownLatch(2);
@@ -330,7 +345,7 @@ public class TokenBillingRepositoryTest {
             String openid = uniqueValue("user");
             String requestId = uniqueValue("request");
             try {
-                fixture.insertAccount(openid, 0, 0);
+                fixture.insertAccount(openid);
                 fixture.insertWallet(openid, "0.00100000");
 
                 assertFalse(fixture.repository.reserveChatQuota(openid, requestId, quote("0.00200000")));
@@ -349,7 +364,7 @@ public class TokenBillingRepositoryTest {
             String openid = uniqueValue("user");
             String requestId = uniqueValue("request");
             try {
-                fixture.insertAccount(openid, 0, 0);
+                fixture.insertAccount(openid);
                 fixture.insertWallet(openid, "0.01000000");
                 assertTrue(fixture.repository.reserveChatQuota(openid, requestId, quote("0.00200000")));
                 assertMoney(new BigDecimal("0.00800000"), fixture.walletAmount(openid));
@@ -374,7 +389,7 @@ public class TokenBillingRepositoryTest {
             String openid = uniqueValue("user");
             String requestId = uniqueValue("request");
             try {
-                fixture.insertAccount(openid, 0, 0);
+                fixture.insertAccount(openid);
                 fixture.insertWallet(openid, "0.01000000");
                 assertTrue(fixture.repository.reserveChatQuota(openid, requestId, quote("0.00400000")));
 
@@ -531,12 +546,12 @@ public class TokenBillingRepositoryTest {
             return new SqlFixture(new JdbcTemplate(dataSource), transactionManager, repository);
         }
 
-        private void insertAccount(String openid, int totalQuota, int surplusQuota) {
+        private void insertAccount(String openid) {
             jdbcTemplate.update(
                     "INSERT INTO user_account "
-                            + "(openid, total_quota, surplus_quota, model_types, status) "
-                            + "VALUES (?, ?, ?, ?, 0)",
-                    openid, totalQuota, surplusQuota, "gpt-3.5-turbo"
+                            + "(openid, model_types, status) "
+                            + "VALUES (?, ?, 0)",
+                    openid, "gpt-3.5-turbo"
             );
         }
 

@@ -18,7 +18,7 @@ import cn.bugstack.chatgpt.data.domain.openai.model.entity.ChatBillingQuote;
 
 /**
  * @author Fuzhengwei bugstack.cn @小傅哥
- * @description 用户额度扣减规则过滤
+ * @description 钱包 Token 预授权规则过滤
  * @create 2023-10-03 16:48
  */
 @Slf4j
@@ -33,14 +33,21 @@ public class UserQuotaFilter implements ILogicFilter<UserAccountQuotaEntity> {
 
     @Override
     public RuleLogicEntity<ChatProcessAggregate> filter(ChatProcessAggregate chatProcess, UserAccountQuotaEntity data) throws Exception {
-            ChatBillingQuote quote = ChatBillingQuote.from(providers.model(chatProcess.getModel()),
-                    chatProcess.getMessages());
-            if (openAiRepository.reserveChatQuota(data.getOpenid(), chatProcess.getRequestId(), quote)) {
-                chatProcess.setQuotaReservation(ChatQuotaReservation.tokenBilling(
-                        openAiRepository, data.getOpenid(), chatProcess.getRequestId()));
-                return RuleLogicEntity.<ChatProcessAggregate>builder()
-                        .type(LogicCheckTypeVO.SUCCESS).data(chatProcess).build();
-            }
+        String openid = chatProcess.getOpenid();
+        if (openid == null || openid.trim().isEmpty()) {
+            return RuleLogicEntity.<ChatProcessAggregate>builder()
+                    .info("登录账户无效，请重新登录后重试。")
+                    .type(LogicCheckTypeVO.REFUSE).data(chatProcess).build();
+        }
+
+        ChatBillingQuote quote = ChatBillingQuote.from(providers.model(chatProcess.getModel()),
+                chatProcess.getMessages());
+        if (openAiRepository.reserveChatQuota(openid, chatProcess.getRequestId(), quote)) {
+            chatProcess.setQuotaReservation(ChatQuotaReservation.tokenBilling(
+                    openAiRepository, openid, chatProcess.getRequestId()));
+            return RuleLogicEntity.<ChatProcessAggregate>builder()
+                    .type(LogicCheckTypeVO.SUCCESS).data(chatProcess).build();
+        }
 
         return RuleLogicEntity.<ChatProcessAggregate>builder()
                 .info("余额不足以预冻结本次请求费用，请充值或缩短上下文后重试。")

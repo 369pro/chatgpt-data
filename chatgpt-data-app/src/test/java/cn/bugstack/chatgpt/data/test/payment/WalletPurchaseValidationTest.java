@@ -64,6 +64,16 @@ public class WalletPurchaseValidationTest {
     }
 
     @Test
+    public void historicalNullCreditProductIsRejectedBeforeOrderPersistence() {
+        when(orderRepository.queryProduct(1001)).thenReturn(product(null));
+
+        assertThrows(IllegalArgumentException.class, () -> orderService.createOrder(cart()));
+
+        verify(orderRepository, never()).queryUnpaidOrder(org.mockito.ArgumentMatchers.any());
+        verify(orderRepository, never()).saveOrder(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     public void createOrderAppliesRechargeFeeBeforePersistence() {
         ProductEntity product = product(GROSS_AMOUNT);
         when(orderRepository.queryProduct(1001)).thenReturn(product);
@@ -111,7 +121,6 @@ public class WalletPurchaseValidationTest {
                 .productId(1001)
                 .productName("wallet")
                 .productDesc("CNY")
-                .quota(0)
                 .price(new BigDecimal("9.90"))
                 .creditAmount(creditAmount)
                 .enable(OpenAIProductEnableModel.OPEN)

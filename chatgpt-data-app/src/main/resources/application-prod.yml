@@ -1,5 +1,10 @@
 server:
   port: 8091
+
+payment:
+  events:
+    rocketmq:
+      enabled: ${PAYMENT_EVENTS_ROCKETMQ_ENABLED:true}
   # 1核2G内存，线程数经验值200；4核8G内存【accept-count=1000、max-threads=800、max-connections=10000】，线程数经验值800。线程池过大，cpu调度会消耗大量时间
   tomcat:
     mbeanregistry:

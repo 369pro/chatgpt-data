@@ -14,8 +14,6 @@ import java.util.List;
 import java.util.Map;
 import cn.bugstack.chatgpt.data.domain.openai.service.rule.impl.AccessLimitFilter;
 import cn.bugstack.chatgpt.data.domain.openai.service.rule.impl.UserQuotaFilter;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import org.junit.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
@@ -31,7 +29,6 @@ public class ChatQuotaFlowTest {
         IOpenAiRepository repository = mock(IOpenAiRepository.class);
         UserAccountQuotaEntity account = new UserAccountQuotaEntity();
         account.setOpenid("user");
-        account.setSurplusQuota(2);
         when(repository.queryUserAccount("user")).thenReturn(account);
         when(repository.reserveChatQuota(eq("user"), eq("request"), any(ChatBillingQuote.class)))
                 .thenReturn(true);
@@ -69,12 +66,8 @@ public class ChatQuotaFlowTest {
     }
 
     @Test
-    public void insufficientQuotaDoesNotCallProvider() throws Exception {
+    public void zeroBalanceWithoutBusinessAccountDoesNotCallProvider() throws Exception {
         IOpenAiRepository repository = mock(IOpenAiRepository.class);
-        UserAccountQuotaEntity account = new UserAccountQuotaEntity();
-        account.setOpenid("user");
-        account.setSurplusQuota(1);
-        account.setTotalQuota(1);
         ChatProvider provider = mock(ChatProvider.class);
         when(provider.id()).thenReturn("deepseek");
         ChatProviderRegistry providers = new ChatProviderRegistry(
@@ -85,29 +78,40 @@ public class ChatQuotaFlowTest {
         when(repository.reserveChatQuota(eq("user"), eq("request"), any(ChatBillingQuote.class)))
                 .thenReturn(false);
         ChatProcessAggregate request = ChatProcessAggregate.builder().openid("user").requestId("request").build();
-        assertEquals(LogicCheckTypeVO.REFUSE, filter.filter(request, account).getType());
+        assertEquals(LogicCheckTypeVO.REFUSE, filter.filter(request, null).getType());
         assertNull(request.getQuotaReservation());
+        verify(repository).reserveChatQuota(eq("user"), eq("request"), any(ChatBillingQuote.class));
         verify(repository, never()).settleChatQuota(anyString(), anyString(), anyBoolean());
     }
 
     @Test
-    public void freeQuotaIsRefundedOnceAndConfirmedUsageIsRetained() throws Exception {
-        Cache<String, Integer> cache = CacheBuilder.newBuilder().build();
+    public void legacyAccessLimitNeverCreatesFreeReservation() throws Exception {
         AccessLimitFilter filter = new AccessLimitFilter();
-        ReflectionTestUtils.setField(filter, "visitCache", cache);
-        ReflectionTestUtils.setField(filter, "limitCount", 1);
-        ReflectionTestUtils.setField(filter, "whiteListStr", "");
         ChatProcessAggregate request = ChatProcessAggregate.builder().openid("user").build();
         assertEquals(LogicCheckTypeVO.SUCCESS, filter.filter(request, null).getType());
-        assertEquals(Integer.valueOf(1), cache.getIfPresent("user"));
-        request.getQuotaReservation().settle(false);
-        request.getQuotaReservation().settle(false);
-        assertEquals(Integer.valueOf(0), cache.getIfPresent("user"));
+        assertNull(request.getQuotaReservation());
+    }
+
+    @Test
+    public void fundedWalletWithoutBusinessAccountCreatesTokenReservation() throws Exception {
+        IOpenAiRepository repository = mock(IOpenAiRepository.class);
+        ChatProvider provider = mock(ChatProvider.class);
+        when(provider.id()).thenReturn("deepseek");
+        ChatProviderRegistry providers = new ChatProviderRegistry(
+                List.of(provider), List.of(pricedModel()), Map.of());
+        UserQuotaFilter filter = new UserQuotaFilter();
+        ReflectionTestUtils.setField(filter, "openAiRepository", repository);
+        ReflectionTestUtils.setField(filter, "providers", providers);
+        when(repository.reserveChatQuota(eq("user"), eq("request"), any(ChatBillingQuote.class)))
+                .thenReturn(true);
+
+        ChatProcessAggregate request = ChatProcessAggregate.builder()
+                .openid("user")
+                .requestId("request")
+                .build();
         assertEquals(LogicCheckTypeVO.SUCCESS, filter.filter(request, null).getType());
-        request.getQuotaReservation().settle(true);
-        request.getQuotaReservation().settle(false);
-        assertEquals(Integer.valueOf(1), cache.getIfPresent("user"));
-        assertEquals(LogicCheckTypeVO.REFUSE, filter.filter(request, null).getType());
+        assertNotNull(request.getQuotaReservation());
+        verify(repository).reserveChatQuota(eq("user"), eq("request"), any(ChatBillingQuote.class));
     }
 
     private static ChatModel pricedModel() {

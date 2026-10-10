@@ -175,11 +175,18 @@
                 <version>2.1.0</version>
             </dependency>
 
-            <!-- big-market api -->
+            <!-- big-market api; keep the package namespace aligned with the
+                 deployed marketing service. -->
             <dependency>
-                <groupId>cn.bugstack</groupId>
+                <groupId>com.pro</groupId>
                 <artifactId>big-market-api</artifactId>
-                <version>1.1</version>
+                <version>1.0-SNAPSHOT</version>
+            </dependency>
+            <!-- Native RocketMQ client; no Spring RocketMQ starter is used. -->
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-client</artifactId>
+                <version>5.3.2</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

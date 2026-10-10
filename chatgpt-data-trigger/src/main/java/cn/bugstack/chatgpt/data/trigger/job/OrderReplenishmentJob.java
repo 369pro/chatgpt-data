@@ -1,8 +1,6 @@
 package cn.bugstack.chatgpt.data.trigger.job;
 
 import cn.bugstack.chatgpt.data.domain.order.service.IOrderService;
-import com.google.common.eventbus.EventBus;
-import com.wechat.pay.java.service.payments.nativepay.NativePayService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -21,8 +19,6 @@ public class OrderReplenishmentJob {
 
     @Resource
     private IOrderService orderService;
-    @Resource
-    private EventBus eventBus;
 
     /**
      * 执行订单补货，超时3分钟，已支付，待发货未发货的订单
@@ -37,7 +33,13 @@ public class OrderReplenishmentJob {
             }
             for (String orderId : orderIds) {
                 log.info("定时任务，订单补货开始。orderId: {}", orderId);
-                eventBus.post(orderId);
+                try {
+                    // Delivery owns the order CAS, wallet grant idempotency and
+                    // the DELIVERED outbox insert. Re-running this job is safe.
+                    orderService.deliverGoods(orderId);
+                } catch (Exception e) {
+                    log.error("定时任务，订单补货失败。orderId: {}", orderId, e);
+                }
             }
         } catch (Exception e) {
             log.error("定时任务，订单补货失败。", e);

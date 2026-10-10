@@ -6,7 +6,7 @@ LLM Market 对话与账户服务，包含多模型流式对话、Token 计费、
 
 准备 JDK 17、Maven、MySQL 和 Redis；活动联动还需要 Nacos 与 `big-market`。当前本地端口为 `8093`，用户端为 `3003`；旧 Docker 示例中的 `8091` 不是当前本地默认端口。
 
-在空数据库中导入 `docs/dev-ops/environment/sql/openai.sql`，再按顺序执行同目录的 `auth_account.sql`、`chat_quota_request.sql`、`account_balance.sql`、`account_quota_grant.sql`、`wallet_purchase.sql`、`recharge_fee.sql`、`wallet_chat_billing.sql`。支付宝沙箱和智谱接入分别参见 `alipay-sandbox-migration.sql`、`zhipu-model-access.sql`。执行前逐份检查 SQL；基础脚本只用于新库，已有数据库应先备份并按已执行版本选择增量，不能直接重建。
+新建空的 `openai` 数据库时只导入 `docs/dev-ops/environment/sql/current-schema.sql`，它是当前钱包与 Token 计费结构的空库基线，不含种子数据。旧版 `openai.sql` 是历史转储，`account_quota_grant.sql` 是已退役的次数账本脚本；两者仅供存量迁移核对，不能作为新库初始化步骤。已有数据库应先备份并按已执行版本选择增量；完成旧次数结构退役后，如需修正已知模型元数据，仅对已完成迁移的数据库执行 `normalize-model-metadata.sql`，不要把它用于空库或直接重建已有数据库。支付宝沙箱和智谱接入分别参见 `alipay-sandbox-migration.sql`、`zhipu-model-access.sql`。
 
 ```bash
 cp .env.example .env

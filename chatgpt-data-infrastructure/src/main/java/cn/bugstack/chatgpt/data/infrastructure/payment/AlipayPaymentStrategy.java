@@ -27,7 +27,7 @@ public class AlipayPaymentStrategy implements PaymentStrategy {
             @Value("${payment.alipay.public-key:}") String publicKey,
             @Value("${payment.alipay.seller-id:}") String sellerId,
             @Value("${payment.alipay.notify-url:}") String notifyUrl,
-            @Value("${payment.alipay.return-url:http://localhost:3003/}") String returnUrl) {
+            @Value("${payment.alipay.return-url:http://localhost:3002/payment/return}") String returnUrl) {
         this.enabled = enabled;
         this.appId = appId;
         this.publicKey = publicKey;

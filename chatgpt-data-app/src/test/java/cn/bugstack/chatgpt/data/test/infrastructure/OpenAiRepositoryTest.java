@@ -1,5 +1,6 @@
 package cn.bugstack.chatgpt.data.test.infrastructure;
 
+import cn.bugstack.chatgpt.data.domain.openai.model.entity.ChatBillingQuote;
 import cn.bugstack.chatgpt.data.infrastructure.adapter.repository.OpenAiRepository;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IChatQuotaDao;
 import cn.bugstack.chatgpt.data.infrastructure.dao.IUserAccountDao;
@@ -34,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.math.BigDecimal;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -45,6 +47,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -69,33 +72,36 @@ public class OpenAiRepositoryTest {
     }
 
     @Test
-    public void reserveRollsBackLedgerWhenAccountHasNoQuota() {
+    public void reserveRollsBackLedgerWhenWalletHasInsufficientFunds() {
+        ChatBillingQuote quote = quote();
         when(chatQuotaDao.insertReservation(any(ChatQuotaPO.class))).thenReturn(1);
-        when(chatQuotaDao.decrementUserQuota("user-1")).thenReturn(0);
+        when(chatQuotaDao.debitWallet("user-1", quote.getReservedAmount())).thenReturn(0);
 
-        assertFalse(repository.reserveChatQuota("user-1", "request-1"));
+        assertFalse(repository.reserveChatQuota("user-1", "request-1", quote));
 
         verify(chatQuotaDao).insertReservation(any(ChatQuotaPO.class));
-        verify(chatQuotaDao).decrementUserQuota("user-1");
+        verify(chatQuotaDao).debitWallet("user-1", quote.getReservedAmount());
+        verify(chatQuotaDao, never()).recordWalletCharge(anyString(), anyString(), any(BigDecimal.class));
         assertTrue(transactionManager.rollbackCount.get() == 1);
         assertTrue(transactionManager.commitCount.get() == 0);
     }
 
     @Test
     public void reserveConvertsDuplicateRequestIntoDistinctException() {
+        ChatBillingQuote quote = quote();
         doThrow(new DuplicateKeyException("duplicate request"))
                 .when(chatQuotaDao).insertReservation(any(ChatQuotaPO.class));
 
         try {
-            repository.reserveChatQuota("user-1", "request-1");
+            repository.reserveChatQuota("user-1", "request-1", quote);
             fail("Expected duplicate request to fail explicitly");
         } catch (IllegalStateException e) {
             assertTrue(e.getMessage().contains("already exists"));
         }
 
         verify(chatQuotaDao).insertReservation(any(ChatQuotaPO.class));
-        org.mockito.Mockito.verify(chatQuotaDao, org.mockito.Mockito.never())
-                .decrementUserQuota(anyString());
+        verify(chatQuotaDao, never()).debitWallet(anyString(), any(BigDecimal.class));
+        verify(chatQuotaDao, never()).recordWalletCharge(anyString(), anyString(), any(BigDecimal.class));
         assertTrue(transactionManager.rollbackCount.get() == 1);
     }
 
@@ -106,15 +112,16 @@ public class OpenAiRepositoryTest {
                         .openid("user-1")
                         .requestId("request-1")
                         .status(ChatQuotaPO.RELEASED)
+                        .chargeAmount(new BigDecimal("0.01000000"))
                         .build());
         when(chatQuotaDao.releaseReservation("user-1", "request-1")).thenReturn(1);
-        when(chatQuotaDao.refundUserQuota("user-1")).thenReturn(1);
+        when(chatQuotaDao.refundWallet("user-1", new BigDecimal("0.01000000"))).thenReturn(1);
 
         repository.settleChatQuota("user-1", "request-1", false);
 
         verify(chatQuotaDao).releaseReservation("user-1", "request-1");
         verify(chatQuotaDao).queryReservation("user-1", "request-1");
-        verify(chatQuotaDao).refundUserQuota("user-1");
+        verify(chatQuotaDao).refundWallet("user-1", new BigDecimal("0.01000000"));
     }
 
     @Test
@@ -126,9 +133,7 @@ public class OpenAiRepositoryTest {
         verify(chatQuotaDao).confirmReservation("user-1", "request-1");
         org.mockito.Mockito.verify(chatQuotaDao, org.mockito.Mockito.never())
                 .releaseReservation(anyString(), anyString());
-        org.mockito.Mockito.verify(chatQuotaDao, org.mockito.Mockito.never())
-                .refundUserQuota(anyString());
-    }
+        }
 
     @Test
     public void alreadySettledFailureDoesNotRefundAgain() {
@@ -147,9 +152,10 @@ public class OpenAiRepositoryTest {
                         .openid("user-1")
                         .requestId("request-1")
                         .status(ChatQuotaPO.RELEASED)
+                        .chargeAmount(new BigDecimal("0.01000000"))
                         .build());
         when(chatQuotaDao.releaseReservation("user-1", "request-1")).thenReturn(1);
-        when(chatQuotaDao.refundUserQuota("user-1")).thenReturn(0);
+        when(chatQuotaDao.refundWallet("user-1", new BigDecimal("0.01000000"))).thenReturn(0);
 
         try {
             repository.settleChatQuota("user-1", "request-1", false);
@@ -157,6 +163,24 @@ public class OpenAiRepositoryTest {
         } catch (DataAccessException e) {
             assertTrue(e.getMessage().contains("Unable to refund"));
         }
+    }
+
+    @Test
+    public void failedSettlementOfLegacyReservationDoesNotFabricateWalletRefund() {
+        when(chatQuotaDao.queryReservation("user-1", "request-1"))
+                .thenReturn(ChatQuotaPO.builder()
+                        .openid("user-1")
+                        .requestId("request-1")
+                        .status(ChatQuotaPO.RELEASED)
+                        .chargeAmount(null)
+                        .build());
+        when(chatQuotaDao.releaseReservation("user-1", "request-1")).thenReturn(1);
+
+        repository.settleChatQuota("user-1", "request-1", false);
+
+        verify(chatQuotaDao).releaseReservation("user-1", "request-1");
+        verify(chatQuotaDao).queryReservation("user-1", "request-1");
+        verify(chatQuotaDao, never()).refundWallet(anyString(), any(BigDecimal.class));
     }
 
     @Test
@@ -170,13 +194,14 @@ public class OpenAiRepositoryTest {
         when(chatQuotaDao.findExpiredReservations(any(Date.class), anyInt()))
                 .thenReturn(Collections.singletonList(expired));
         when(chatQuotaDao.releaseReservationById(11L)).thenReturn(1);
-        when(chatQuotaDao.refundUserQuota("user-1")).thenReturn(1);
+        expired.setChargeAmount(new BigDecimal("0.01000000"));
+        when(chatQuotaDao.refundWallet("user-1", new BigDecimal("0.01000000"))).thenReturn(1);
 
         repository.releaseExpiredChatQuotas();
 
         verify(chatQuotaDao).findExpiredReservations(any(Date.class), eq(100));
         verify(chatQuotaDao).releaseReservationById(11L);
-        verify(chatQuotaDao).refundUserQuota("user-1");
+        verify(chatQuotaDao).refundWallet("user-1", new BigDecimal("0.01000000"));
     }
 
     /**
@@ -186,18 +211,36 @@ public class OpenAiRepositoryTest {
      * (or the MYSQL_* equivalents).
      */
     @Test
-    public void sqlInsufficientQuotaRollsBackLedgerInsert() throws Exception {
+    public void sqlInsufficientWalletRollsBackLedgerInsertWithoutLegacyCountAccess() throws Exception {
         assumeSqlIntegration();
         try (SqlFixture fixture = SqlFixture.open()) {
             String openid = uniqueValue("user");
             String requestId = uniqueValue("request");
             try {
-                fixture.insertAccount(openid, 0, 0);
+                fixture.insertAccount(openid);
+                fixture.insertWallet(openid, "0.00100000");
 
-                assertFalse(fixture.repository.reserveChatQuota(openid, requestId));
+                assertFalse(fixture.repository.reserveChatQuota(openid, requestId, quote()));
                 assertEquals(0, fixture.countLedger(openid, requestId));
-                assertEquals(Integer.valueOf(0), fixture.queryInt(
-                        "SELECT surplus_quota FROM user_account WHERE openid = ?", openid));
+                assertMoney(new BigDecimal("0.00100000"), fixture.walletAmount(openid));
+            } finally {
+                fixture.deleteAccount(openid);
+            }
+        }
+    }
+
+    @Test
+    public void sqlFundedWalletCanReserveWithoutBusinessAccount() throws Exception {
+        assumeSqlIntegration();
+        try (SqlFixture fixture = SqlFixture.open()) {
+            String openid = uniqueValue("wallet-only");
+            String requestId = uniqueValue("request");
+            try {
+                fixture.insertWallet(openid, "0.01000000");
+
+                assertTrue(fixture.repository.reserveChatQuota(openid, requestId, quote()));
+                assertEquals(1, fixture.countLedger(openid, requestId));
+                assertMoney(new BigDecimal("0.00000000"), fixture.walletAmount(openid));
             } finally {
                 fixture.deleteAccount(openid);
             }
@@ -212,14 +255,16 @@ public class OpenAiRepositoryTest {
             String requestId = uniqueValue("request");
             ExecutorService executor = Executors.newFixedThreadPool(2);
             try {
-                fixture.insertAccount(openid, 2, 2);
+                fixture.insertAccount(openid);
+                fixture.insertWallet(openid, "0.01000000");
+                ChatBillingQuote quote = quote();
                 CountDownLatch ready = new CountDownLatch(2);
                 CountDownLatch start = new CountDownLatch(1);
                 Callable<Attempt> attempt = () -> {
                     ready.countDown();
                     start.await(30, TimeUnit.SECONDS);
                     try {
-                        return Attempt.success(fixture.repository.reserveChatQuota(openid, requestId));
+                        return Attempt.success(fixture.repository.reserveChatQuota(openid, requestId, quote));
                     } catch (RuntimeException e) {
                         return Attempt.failure(e);
                     }
@@ -241,8 +286,7 @@ public class OpenAiRepositoryTest {
                 assertEquals(1, successes);
                 assertEquals(1, duplicateFailures);
                 assertEquals(1, fixture.countLedger(openid, requestId));
-                assertEquals(Integer.valueOf(1), fixture.queryInt(
-                        "SELECT surplus_quota FROM user_account WHERE openid = ?", openid));
+                assertMoney(new BigDecimal("0.00000000"), fixture.walletAmount(openid));
             } finally {
                 executor.shutdownNow();
                 fixture.deleteAccount(openid);
@@ -251,24 +295,18 @@ public class OpenAiRepositoryTest {
     }
 
     @Test
-    public void sqlFailedSettlementTwiceRefundsOnlyOnceAndKeepsTotalQuota() throws Exception {
+    public void sqlFailedSettlementTwiceRetiresLegacyReservationWithoutRefund() throws Exception {
         assumeSqlIntegration();
         try (SqlFixture fixture = SqlFixture.open()) {
             String openid = uniqueValue("user");
             String requestId = uniqueValue("request");
             try {
-                fixture.insertAccount(openid, 7, 1);
-                assertTrue(fixture.repository.reserveChatQuota(openid, requestId));
-                assertEquals(Integer.valueOf(0), fixture.queryInt(
-                        "SELECT surplus_quota FROM user_account WHERE openid = ?", openid));
+                fixture.insertAccount(openid);
+                fixture.insertLegacyReservation(openid, requestId);
 
                 fixture.inTransaction(() -> fixture.repository.settleChatQuota(openid, requestId, false));
                 fixture.inTransaction(() -> fixture.repository.settleChatQuota(openid, requestId, false));
 
-                assertEquals(Integer.valueOf(7), fixture.queryInt(
-                        "SELECT total_quota FROM user_account WHERE openid = ?", openid));
-                assertEquals(Integer.valueOf(1), fixture.queryInt(
-                        "SELECT surplus_quota FROM user_account WHERE openid = ?", openid));
                 assertEquals(Integer.valueOf(ChatQuotaPO.RELEASED), fixture.queryInt(
                         "SELECT status FROM chat_quota_request WHERE openid = ? AND request_id = ?",
                         openid, requestId));
@@ -291,6 +329,21 @@ public class OpenAiRepositoryTest {
         return "quota-it-" + prefix + "-" + UUID.randomUUID().toString().replace("-", "");
     }
 
+    private static ChatBillingQuote quote() {
+        return new ChatBillingQuote(
+                "snapshot-model",
+                new BigDecimal("3.00000000"),
+                new BigDecimal("1.00000000"),
+                new BigDecimal("5.00000000"),
+                new BigDecimal("0.01000000")
+        );
+    }
+
+    private static void assertMoney(BigDecimal expected, BigDecimal actual) {
+        assertTrue("expected " + expected + " but was " + actual,
+                actual != null && expected.compareTo(actual) == 0);
+    }
+
     private static void setField(Object target, String name, Object value) {
         try {
             java.lang.reflect.Field field = target.getClass().getDeclaredField(name);
@@ -302,7 +355,6 @@ public class OpenAiRepositoryTest {
     }
 
     private void verifyNoInteractionsExceptRelease() {
-        org.mockito.Mockito.verify(chatQuotaDao, org.mockito.Mockito.never()).refundUserQuota(anyString());
         org.mockito.Mockito.verify(chatQuotaDao, org.mockito.Mockito.never())
                 .queryReservation(anyString(), anyString());
         org.mockito.Mockito.verify(chatQuotaDao, org.mockito.Mockito.never()).confirmReservation(anyString(), anyString());
@@ -398,12 +450,28 @@ public class OpenAiRepositoryTest {
             return new SqlFixture(new JdbcTemplate(dataSource), transactionManager, repository);
         }
 
-        private void insertAccount(String openid, int totalQuota, int surplusQuota) {
+        private void insertAccount(String openid) {
             jdbcTemplate.update(
                     "INSERT INTO user_account "
-                            + "(openid, total_quota, surplus_quota, model_types, status) "
-                            + "VALUES (?, ?, ?, ?, 0)",
-                    openid, totalQuota, surplusQuota, "gpt-3.5-turbo"
+                            + "(openid, model_types, status) "
+                            + "VALUES (?, ?, 0)",
+                    openid, "gpt-3.5-turbo"
+            );
+        }
+
+        private void insertWallet(String openid, String amount) {
+            BigDecimal value = new BigDecimal(amount);
+            jdbcTemplate.update(
+                    "INSERT INTO account_wallet (openid, currency, available_amount, total_amount) "
+                            + "VALUES (?, 'CNY', ?, ?)",
+                    openid, value, value
+            );
+        }
+
+        private void insertLegacyReservation(String openid, String requestId) {
+            jdbcTemplate.update(
+                    "INSERT INTO chat_quota_request (openid, request_id, status) VALUES (?, ?, ?)",
+                    openid, requestId, ChatQuotaPO.RESERVED
             );
         }
 
@@ -421,6 +489,14 @@ public class OpenAiRepositoryTest {
             return jdbcTemplate.queryForObject(sql, Integer.class, args);
         }
 
+        private BigDecimal walletAmount(String openid) {
+            return jdbcTemplate.queryForObject(
+                    "SELECT available_amount FROM account_wallet WHERE openid = ?",
+                    BigDecimal.class,
+                    openid
+            );
+        }
+
         private void inTransaction(Runnable action) {
             new TransactionTemplate(transactionManager).execute(status -> {
                 action.run();
@@ -430,6 +506,7 @@ public class OpenAiRepositoryTest {
 
         private void deleteAccount(String openid) {
             jdbcTemplate.update("DELETE FROM chat_quota_request WHERE openid = ?", openid);
+            jdbcTemplate.update("DELETE FROM account_wallet WHERE openid = ?", openid);
             jdbcTemplate.update("DELETE FROM user_account WHERE openid = ?", openid);
         }
 

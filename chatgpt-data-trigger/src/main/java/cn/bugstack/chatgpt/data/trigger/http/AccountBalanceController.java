@@ -19,8 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import java.util.Map;
-import cn.bugstack.chatgpt.data.domain.account.service.IAccountQueryService;
-import cn.bugstack.chatgpt.data.domain.account.model.valobj.AccountQuotaVO;
 
 /**
  * CNY wallet grant and query endpoints.
@@ -40,8 +38,6 @@ public class AccountBalanceController {
     private IBalanceQueryService balanceQueryService;
     @Resource
     private IAuthService authService;
-    @Resource
-    private IAccountQueryService accountQueryService;
 
     @RequestMapping(value = "adjust_balance", method = RequestMethod.POST)
     public Response<AccountBalanceResponseDTO> adjustBalance(@RequestBody AdjustBalanceRequestDTO request) {
@@ -79,10 +75,7 @@ public class AccountBalanceController {
             String openid = authService.openid(token);
             AccountBalanceVO balance = balanceQueryService.queryBalance(openid);
             Response<AccountBalanceResponseDTO> response = success(balance);
-            AccountQuotaVO legacy = accountQueryService.queryAccountQuota(openid);
             response.getData().setBillingMode("TOKEN");
-            response.getData().setLegacyQuota(legacy == null || legacy.getSurplusQuota() == null
-                    ? 0 : legacy.getSurplusQuota());
             return response;
         } catch (IllegalArgumentException e) {
             return failure(Constants.ResponseCode.ILLEGAL_PARAMETER);

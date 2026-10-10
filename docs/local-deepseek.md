@@ -2,7 +2,7 @@
 
 ## MVP 更新
 
-- 模型列表由后端 `GET /api/v1/chatgpt/models` 提供，目前为 `deepseek-flash`（V4.1 Flash）和 `deepseek-v4-pro`（V4 Pro）。旧会话模型名自动迁移，消息保留。
+- 模型列表由后端 `GET /api/v1/chatgpt/models` 提供，默认包含 `deepseek-flash`（V4.1 Flash）和 `deepseek-v4-pro`（V4 Pro）；启用 `ZHIPU_ENABLED` 后还会包含 `glm-5.3-flash`。旧会话中的 `deepseek-chat`、`deepseek-reasoner` 和 `deepseek-v4-flash` 会自动迁移到 `deepseek-flash`，消息保留。
 - 模型配置位于 `chatgpt-data-app/src/main/resources/application-models.yml`。同协议的新提供商只需配置 `llm.providers` 与 `llm.models`；不同协议实现 `ChatProvider` 并注册为 Spring Bean。密钥仍只放后端 `.env`。
 - 启动前增量执行 `docs/dev-ops/environment/sql/chat_quota_request.sql`，不要重新导入整个数据库。本机已执行。
 - 账户额度先预占，输出首段有效内容后确认；此前失败或取消返还，部分回复后取消仍计一次。过期预占超过 15 分钟后由每分钟任务回收。免费体验次数仍是原有单机缓存，失败时也会返还，尚不是分布式计费。
@@ -19,7 +19,7 @@
 - Nacos：本机 `127.0.0.1:8848`，保留现有 Dubbo 依赖。
 - 前端为相邻的 `../chatgpt-web` 仓库。
 
-上述端口均可通过 `.env` 修改。本机已有基础服务；不要重复导入原始 SQL 覆盖已有数据。新环境需要初始化 `docs/dev-ops/environment/sql/openai.sql`，再执行同目录的 `auth_account.sql`。
+上述端口均可通过 `.env` 修改。本机已有基础服务；不要重复导入原始 SQL 覆盖已有数据。空数据库请初始化 `docs/dev-ops/environment/sql/current-schema.sql`；已有数据库应先备份并按已执行版本选择增量迁移。
 
 ## 配置与启动
 
@@ -44,7 +44,7 @@ npm install
 npx next dev -H 127.0.0.1 -p 3003
 ```
 
-打开 `http://localhost:3003`，注册或登录账号，选择 `deepseek-chat` 开始对话。新账号沿用原有免费访问额度，默认 10 次；已有额度账户需要在允许模型列表中加入 `deepseek-chat` / `deepseek-reasoner`。前端变量带 `NEXT_PUBLIC_` 会公开到浏览器，绝对不要放 API Key。
+打开 `http://localhost:3003`，注册或登录账号，选择 `deepseek-flash`（默认）或 `deepseek-v4-pro` 开始对话；启用 `ZHIPU_ENABLED` 后还可选择 `glm-5.3-flash`。账户 `model_types` 应保存这些规范模型 ID，旧别名仅用于兼容已持久化的会话。新账号沿用原有免费访问额度，默认 10 次。前端变量带 `NEXT_PUBLIC_` 会公开到浏览器，绝对不要放 API Key。
 
 ## 验证
 

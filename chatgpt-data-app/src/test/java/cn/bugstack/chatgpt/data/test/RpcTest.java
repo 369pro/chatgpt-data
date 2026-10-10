@@ -1,12 +1,12 @@
 package cn.bugstack.chatgpt.data.test;
 
-import cn.bugstack.trigger.api.IRaffleActivityService;
-import cn.bugstack.trigger.api.IRebateService;
-import cn.bugstack.trigger.api.dto.ActivityDrawRequestDTO;
-import cn.bugstack.trigger.api.dto.ActivityDrawResponseDTO;
-import cn.bugstack.trigger.api.dto.RebateRequestDTO;
-import cn.bugstack.trigger.api.request.Request;
-import cn.bugstack.trigger.api.response.Response;
+import com.pro.trigger.api.IRaffleActivityService;
+import com.pro.trigger.api.IRebateService;
+import com.pro.trigger.api.dto.ActivityDrawRequestDTO;
+import com.pro.trigger.api.dto.ActivityDrawResponseDTO;
+import com.pro.trigger.api.dto.RebateRequestDTO;
+import com.pro.trigger.api.request.Request;
+import com.pro.trigger.api.response.Response;
 import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
@@ -33,7 +33,7 @@ public class RpcTest {
         request.setUserId("xiaofuge");
         Response<ActivityDrawResponseDTO> response = raffleActivityService.draw(request);
 
-        log.info("请求参数：{}", JSON.toJSONString(request));
+        log.info("请求参数：userId={}, activityId={}", request.getUserId(), request.getActivityId());
         log.info("测试结果：{}", JSON.toJSONString(response));
     }
 
@@ -51,7 +51,7 @@ public class RpcTest {
         request.setData(requestDTO);
 
         Response<Boolean> response = rebateService.rebate(request);
-        log.info("请求参数：{}", JSON.toJSONString(request));
+        log.info("请求参数：userId={}, businessNo={}", requestDTO.getUserId(), requestDTO.getOutBusinessNo());
         log.info("测试结果：{}", JSON.toJSONString(response));
     }
 

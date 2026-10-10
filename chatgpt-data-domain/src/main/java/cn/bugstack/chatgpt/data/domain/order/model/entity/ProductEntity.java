@@ -33,15 +33,11 @@ public class ProductEntity {
      */
     private String productDesc;
     /**
-     * 额度次数
-     */
-    private Integer quota;
-    /**
      * 商品价格
      */
     private BigDecimal price;
     /**
-     * 钱包充值金额；为空表示历史额度商品
+     * 钱包充值金额；为空表示历史商品，不能新购
      */
     private BigDecimal creditAmount;
     private BigDecimal feeRate;

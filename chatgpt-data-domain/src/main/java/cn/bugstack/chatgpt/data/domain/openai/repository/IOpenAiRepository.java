@@ -11,20 +11,9 @@ import cn.bugstack.chatgpt.data.domain.openai.model.entity.ChatUsage;
  */
 public interface IOpenAiRepository {
 
-    int subAccountQuota(String openai);
-
     UserAccountQuotaEntity queryUserAccount(String openid);
 
-    /**
-     * Reserves one chat quota unit for a request. The reservation is durable
-     * and idempotency is scoped to the user and request ID.
-     *
-     * @return {@code true} when one quota unit was reserved, otherwise
-     * {@code false} when the existing account has no available quota
-     * @throws IllegalStateException when the user has already used the request ID
-     */
-    boolean reserveChatQuota(String openid, String requestId);
-
+    /** Reserve wallet funds and snapshot model prices. */
     boolean reserveChatQuota(String openid, String requestId, ChatBillingQuote quote);
 
     void settleChatUsage(String openid, String requestId, ChatUsage usage);

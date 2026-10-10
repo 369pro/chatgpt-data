@@ -47,59 +47,44 @@ public class OpenAiRepository implements IOpenAiRepository {
     private PlatformTransactionManager transactionManager;
 
     @Override
-    public int subAccountQuota(String openai) {
-        return userAccountDao.subAccountQuota(openai);
-    }
-
-    @Override
     public UserAccountQuotaEntity queryUserAccount(String openid) {
         UserAccountPO userAccountPO = userAccountDao.queryUserAccount(openid);
         if (null == userAccountPO) return null;
         UserAccountQuotaEntity userAccountQuotaEntity = new UserAccountQuotaEntity();
         userAccountQuotaEntity.setOpenid(userAccountPO.getOpenid());
-        userAccountQuotaEntity.setTotalQuota(userAccountPO.getTotalQuota());
-        userAccountQuotaEntity.setSurplusQuota(userAccountPO.getSurplusQuota());
         userAccountQuotaEntity.setUserAccountStatusVO(UserAccountStatusVO.get(userAccountPO.getStatus()));
         userAccountQuotaEntity.genModelTypes(userAccountPO.getModelTypes());
         return userAccountQuotaEntity;
     }
 
     /**
-     * Inserts the durable ledger row before the guarded account decrement. The
+     * Inserts the durable ledger row before the guarded wallet debit. The
      * transaction is deliberately short and contains no model call. A private
      * rollback exception lets the public contract return {@code false} while
-     * still rolling back the inserted RESERVED row when quota is unavailable.
+     * still rolling back the inserted RESERVED row when the wallet is short.
      */
     @Override
-    public boolean reserveChatQuota(String openid, String requestId) {
-        return reserveChatQuota(openid, requestId, null);
-    }
-
-    @Override
     public boolean reserveChatQuota(String openid, String requestId, ChatBillingQuote quote) {
+        if (quote == null) throw new IllegalArgumentException("Token billing quote is required");
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         try {
             return transaction.execute(status -> {
                 ChatQuotaPO reservation = ChatQuotaPO.reserved(openid, requestId);
-                if (quote != null) {
-                    reservation.setModel(quote.getModel());
-                    reservation.setInputPrice(quote.getInputPrice());
-                    reservation.setCachedInputPrice(quote.getCachedInputPrice());
-                    reservation.setOutputPrice(quote.getOutputPrice());
-                }
+                reservation.setModel(quote.getModel());
+                reservation.setInputPrice(quote.getInputPrice());
+                reservation.setCachedInputPrice(quote.getCachedInputPrice());
+                reservation.setOutputPrice(quote.getOutputPrice());
                 int inserted = chatQuotaDao.insertReservation(reservation);
                 if (inserted != 1) {
                     throw new DataAccessResourceFailureException("Unable to record chat quota reservation");
                 }
-                // Preserve historical entitlements, then debit the wallet at a snapshotted price.
-                if (chatQuotaDao.decrementUserQuota(openid) != 1) {
-                    if (quote == null || chatQuotaDao.debitWallet(openid, quote.getReservedAmount()) != 1) {
-                        throw new InsufficientChatQuotaException();
-                    }
-                    if (chatQuotaDao.recordWalletCharge(openid, requestId, quote.getReservedAmount()) != 1) {
-                        throw new DataAccessResourceFailureException("Unable to snapshot chat charge");
-                    }
+                // New requests always use the wallet; legacy counts are no longer spendable.
+                if (chatQuotaDao.debitWallet(openid, quote.getReservedAmount()) != 1) {
+                    throw new InsufficientChatQuotaException();
+                }
+                if (chatQuotaDao.recordWalletCharge(openid, requestId, quote.getReservedAmount()) != 1) {
+                    throw new DataAccessResourceFailureException("Unable to snapshot chat charge");
                 }
                 return true;
             });
@@ -112,7 +97,7 @@ public class OpenAiRepository implements IOpenAiRepository {
 
     /**
      * The model call happens outside this transaction. Only the ledger state
-     * transition and, for failures, the one-unit refund are performed here.
+     * transition and, for failures, the wallet refund are performed here.
      */
     @Override
     @Transactional(
@@ -165,10 +150,16 @@ public class OpenAiRepository implements IOpenAiRepository {
 
     private void refund(ChatQuotaPO reservation) {
         if (reservation == null) throw new DataAccessResourceFailureException("Missing chat charge ledger");
-        int refunded = reservation.getChargeAmount() == null
-                ? chatQuotaDao.refundUserQuota(reservation.getOpenid())
-                : chatQuotaDao.refundWallet(reservation.getOpenid(), reservation.getChargeAmount());
-        if (refunded != 1) throw new DataAccessResourceFailureException("Unable to refund chat charge");
+        if (reservation.getChargeAmount() == null) {
+            // Historical count reservations are retired. There is no wallet
+            // amount to restore and no legacy count column after migration.
+            log.info("Skipping refund for retired legacy chat reservation: openid={}, requestId={}",
+                    reservation.getOpenid(), reservation.getRequestId());
+            return;
+        }
+        if (chatQuotaDao.refundWallet(reservation.getOpenid(), reservation.getChargeAmount()) != 1) {
+            throw new DataAccessResourceFailureException("Unable to refund chat charge");
+        }
     }
 
     @Override

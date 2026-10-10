@@ -1,16 +1,17 @@
 # Wallet 与 Token 计费
 
-> 设计与运维说明，基线日期：2026-10-02。金额单位为 CNY。
+> 设计与运维说明，基线日期：2026-10-07。金额单位为 CNY。
+> 面向产品与代码阅读的现状解释见 [AI 对话怎样扣余额](chat-balance-billing-explained.md)。
 
 ## 1. 账户与购买
 
 ### 商品和订单快照
 
-- `openai_product.credit_amount` 表示扣除充值手续费后的 CNY 钱包到账金额，新钱包商品的旧 `quota` 保持为 `0`。商品查询和下单统一按实付 `price` 计算手续费，不对已有净额再次扣费。
+- `openai_product.credit_amount` 表示扣除充值手续费后的 CNY 钱包到账金额，旧 `quota` 列已移除。商品查询和下单统一按实付 `price` 计算手续费，不对已有净额再次扣费。
 - 当前种子商品 `1001`、`1002`、`1003` 的实付金额分别为 `9.90`、`29.90`、`99.90` CNY，净到账分别为 `7.92`、`23.92`、`89.91` CNY。
 - 创建订单时把净到账金额写入 `openai_order.product_credit_amount`，手续费率和金额写入 `product_fee_rate`、`product_fee_amount`。这是订单快照，不能在发货时重新读取商品价格或套用新费率。详细规则见 [充值手续费](recharge-service-fee.md)。
-- `product_credit_amount IS NULL` 只表示历史额度订单。历史订单不转换，仍按原有 `product_quota` 发货；非空快照才走钱包充值。
-- 新聊天仍然优先消耗 `user_account.surplus_quota` 中的历史剩余额度。只有额度 CAS 扣减失败且请求有 Token 计费报价时，才预授权钱包。
+- `product_credit_amount IS NULL` 只表示历史额度订单。历史订单不折算为余额；未完成的旧次数订单需人工处理，不再按次数发货。非空快照才走钱包充值。
+- 所有已认证的新聊天均按 Token 报价预授权钱包；无业务账户也不能通过免费次数分支绕过扣费，详见现状解释文档。旧账户次数列 `total_quota`、`surplus_quota` 已移除，余额不足时不能使用旧次数抵扣。
 
 ### 支付 CAS 与钱包发货
 
@@ -19,9 +20,9 @@
 已支付订单发货在一个本地数据库事务内完成，不能嵌套 `REQUIRES_NEW` 的余额事务：
 
 1. 查询订单，并执行 `DELIVER_GOODS` CAS：只有 `order_status = 1 AND pay_status = 1` 的订单可以变为 `order_status = 2`。
-2. 若订单有 `product_credit_amount`，必要时创建零额度 `user_account`，不增加次数额度。
+2. 若订单有 `product_credit_amount`，必要时创建 `user_account` 身份记录。
 3. 以 `app_id = 'payment'`、`request_id = orderId` 插入 `balance_grant`。该键由唯一索引保护；首次插入才累加 `account_wallet`，重试只校验 `openid` 和金额快照，不能再次充值。
-4. 若订单快照为 `NULL`，执行旧的 `product_quota` 发货路径，不创建余额 grant。
+4. 若订单快照为 `NULL`，拒绝自动发货，保留订单供人工核对，不创建余额 grant。
 
 订单状态 CAS、grant 唯一插入、钱包 upsert 和必要的账户初始化必须同一事务提交。任一步失败都回滚发货状态和 grant，避免“已发货但未到账”或重复到账。
 
@@ -29,7 +30,7 @@
 
 ### 费率快照和预授权
 
-每个新聊天请求按所选模型的每百万 Token 费率计费，费率包括：
+进入钱包路径的新聊天请求按所选模型的每百万 Token 费率计费，费率包括：
 
 - 输入 Token：缓存未命中价；
 - 缓存命中输入 Token：缓存价；
@@ -55,8 +56,8 @@ hold = CEILING_8(
 
 ### 请求、结算和异常
 
-1. 先写 `RESERVED` 记录；优先尝试扣减历史次数额度。
-2. 历史额度不足时，在同一短事务内按 hold 扣减钱包，并把 hold 写入 `charge_amount`。
+1. 先写 `RESERVED` 记录，保存模型费率及预授权金额；新请求仅使用钱包。
+2. 在同一短事务内按 hold 扣减钱包，并把 hold 写入 `charge_amount`；余额不足则回滚，不再扣减历史次数。
 3. 模型调用在事务外进行，避免把网络调用放进数据库事务。
 4. 上游返回实际用量后，按请求内的费率快照计算实际费用：hold 大于实际费用时退回差额；实际费用相等时不动余额。
 5. 实际费用大于 hold 时，只尝试补扣差额。补扣失败则进入 `REVIEW`，保留原 hold，禁止透支；实际用量和结算金额保留给人工对账。
@@ -112,8 +113,9 @@ ZHIPU_FLASH_OUTPUT_PRICE         # 默认 2.8
 3. 执行 `wallet_purchase.sql`，增加商品金额和订单金额快照列，并更新新商品种子数据。
 4. 执行 `wallet_chat_billing.sql`，增加 Token 费率、usage、hold 和结算字段。
 5. 执行 `recharge_fee.sql`，增加手续费快照列，并将当前钱包商品更新为净到账金额。
+6. 停止旧应用并备份相关表，再执行 `retire_legacy_conversation_quota.sql`，删除账户、商品、订单的旧次数列和 `account_quota_grant` 表，随后启动新版本。清理迁移必须最后执行；不要在其后重跑引用旧列的历史种子脚本。
 
-这些迁移均按 `information_schema` 检查后执行 `ALTER TABLE`，可以重复运行。它们不重写历史订单：历史次数订单的 `product_credit_amount` 保持 `NULL`，历史聊天记录的 `charge_amount` 也保持 `NULL`，继续使用原有次数语义；手续费上线前的余额订单保留原到账金额，手续费快照保持 `NULL`。不要用重新导入或 `DROP TABLE` 的方式替代迁移；生产执行前先备份并确认数据库、表和列名。
+这些迁移均按 `information_schema` 检查后执行 `ALTER TABLE`，可以重复运行。它们不重写历史订单：历史次数订单的 `product_credit_amount` 保持 `NULL`，历史聊天记录的 `charge_amount` 也保持 `NULL`，仅用于识别历史记录，不再产生次数扣减或发放；手续费上线前的余额订单保留原到账金额，手续费快照保持 `NULL`。不要用重新导入或 `DROP TABLE` 的方式替代迁移；生产执行前先备份并确认数据库、表和列名。
 
 `docs/dev-ops/environment/sql/` 中的 SQL 是内部部署 helper，不是公开 API，也不能通过 HTTP/Dubbo 暴露任意 SQL 执行能力。仅由受控的发布/运维流程执行，并记录执行顺序和数据库版本。
 
@@ -132,8 +134,8 @@ mvn -pl chatgpt-data-app -am -DskipTests=false \
 
 也可使用测试 fixture 兼容的 `CHAT_QUOTA_JDBC_URL`、`CHAT_QUOTA_DB_USER`、`CHAT_QUOTA_DB_PASSWORD`。迁移完成后重点覆盖：
 
-- 钱包购买的 real MyBatis mapper、发货 CAS、grant 唯一性、重复/并发发货、历史订单 quota 分支、事务回滚和金额快照；
-- Token 预授权优先消耗历史额度、费率快照、实际 usage 退款、错误释放、15 分钟恢复以及不足补扣进入 `REVIEW`；
+- 钱包购买的 real MyBatis mapper、发货 CAS、grant 唯一性、重复/并发发货、历史次数订单拒绝自动发货、事务回滚和金额快照；
+- Token 预授权仅使用钱包、费率快照、实际 usage 退款、错误释放、15 分钟恢复以及不足补扣进入 `REVIEW`；
 - SQL 测试使用唯一 fixture 账号和订单，不产生真实支付费用。
 
 回归结果见下面的验证记录，后续修改仍需重新运行。
@@ -145,3 +147,13 @@ mvn -pl chatgpt-data-app -am -DskipTests=false \
 - 使用隔离的本地注册测试用户验证真实链路：初始次数额度为 0，钱包余额为 `1.00` CNY。真实 DeepSeek Flash 请求使用 prompt 8、output 1、cached 0，结算费用为 `0.00002400` CNY；GLM Flash 请求使用 prompt 16、output 3、cached 0，结算费用为 `0.00002120` CNY。两次请求均返回 `OK`，相同 request 重试后余额保持不变。
 - 钱包购买发货已由真实 MySQL 测试验证；测试 fixture 已登出并完成数据库清理。
 - 本任务没有重新执行 Alipay 浏览器支付流程；该项不属于本轮新增验证证据。
+
+### 2026-10-07 旧次数结构退役
+
+删除 `user_account.total_quota`、`user_account.surplus_quota`、`openai_product.quota`、
+`openai_order.product_quota` 和 `account_quota_grant`。相关旧接口、DAO、实体字段和页面展示同步移除。
+`chat_quota_request` 仍是 Token 结算账本，不能删除；历史 NULL 金额记录保留，不折算或退款为现金。
+
+本地执行前导出相关表到受限权限的独立备份目录，停止旧应用后执行迁移。
+独立测试库连续执行两次迁移成功；本地钱包金额总和、订单和聊天账本记录数在迁移前后相同。
+数据库恢复应先停止应用，将备份恢复到独立数据库核对，再按需要恢复旧字段；不要覆盖迁移后产生的新钱包流水。

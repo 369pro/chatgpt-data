@@ -27,15 +27,7 @@ public class UserAccountPO {
      */
     private String openid;
     /**
-     * 总量额度
-     */
-    private Integer totalQuota;
-    /**
-     * 剩余额度
-     */
-    private Integer surplusQuota;
-    /**
-     * 可用模型；gpt-3.5-turbo,gpt-3.5-turbo-16k,gpt-4,gpt-4-32k
+     * 可用模型 ID；逗号分隔，须与 application-models.yml 中的公开模型 ID 一致
      */
     private String modelTypes;
     /**
