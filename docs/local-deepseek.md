@@ -1,5 +1,7 @@
 # DeepSeek 本地运行
 
+> 本文是独立本机 `3003/8093` 方案。当前 Docker 环境使用 `3002/8091`，请按相邻 `big-market/docs/dev-ops/local/README.md` 启动。两种模式不要混用构建：Docker 前端使用 `npm run build:local` 和 `.next-local`，本机开发使用 `.next`。
+
 ## MVP 更新
 
 - 模型列表由后端 `GET /api/v1/chatgpt/models` 提供，默认包含 `deepseek-flash`（V4.1 Flash）和 `deepseek-v4-pro`（V4 Pro）；启用 `ZHIPU_ENABLED` 后还会包含 `glm-5.3-flash`。旧会话中的 `deepseek-chat`、`deepseek-reasoner` 和 `deepseek-v4-flash` 会自动迁移到 `deepseek-flash`，消息保留。
@@ -37,11 +39,11 @@ bash run-local.sh
 
 首次会构建项目；已构建时可以执行 `bash run-local.sh --no-build`。默认仅监听 `127.0.0.1:8093`。
 
-在前端仓库 `.env.local` 设置 `NEXT_PUBLIC_API_HOST_URL=http://127.0.0.1:8093`，然后启动：
+独立本机模式在前端仓库临时指定 API 地址，不改写 Docker 默认 `.env.local`：
 
 ```bash
 npm install
-npx next dev -H 127.0.0.1 -p 3003
+NEXT_PUBLIC_API_HOST_URL=http://127.0.0.1:8093 npx next dev -H 127.0.0.1 -p 3003
 ```
 
 打开 `http://localhost:3003`，注册或登录账号，选择 `deepseek-flash`（默认）或 `deepseek-v4-pro` 开始对话；启用 `ZHIPU_ENABLED` 后还可选择 `glm-5.3-flash`。账户 `model_types` 应保存这些规范模型 ID，旧别名仅用于兼容已持久化的会话。新账号沿用原有免费访问额度，默认 10 次。前端变量带 `NEXT_PUBLIC_` 会公开到浏览器，绝对不要放 API Key。
